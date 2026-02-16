@@ -189,7 +189,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• 📨 Связаться с админом - задать вопрос\n"
         "• ❓ Помощь - показать все команды\n"
         "• ❌ Отмена - отменить текущее действие\n\n"
-        "⚽ Доступные игры:"
+        "🎮 Доступные игры:"
     )
     
     await send_main_menu(update, context, welcome_text)
@@ -234,6 +234,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SELECTING_GAME
     
     elif callback_data == "back_to_menu":
+        # Очищаем данные пользователя
+        context.user_data.clear()
+        # Показываем главное меню
         welcome_text = (
             "👋 Главное меню\n\n"
             "⚽ Доступные игры:"
@@ -339,7 +342,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"✅ Новая регистрация: {registration}")
 
-    # Отправляем подтверждение пользователю
+    # Отправляем подтверждение пользователю с кнопкой возврата в меню
     await update.message.reply_text(
         "✅ Спасибо за регистрацию, увидимся на игре! ♥️😉\n\n"
         "📨 Если есть вопросы - нажмите кнопку 'Связаться с админом' в главном меню.",
@@ -369,7 +372,9 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception as e:
             logger.error(f"Ошибка отправки админу {admin_id}: {e}")
 
-    context.user_data.clear()
+    # Не очищаем user_data сразу, чтобы кнопка back_to_menu сработала
+    # context.user_data.clear() - закомментировано
+    
     return SELECTING_GAME
 
 # --- Обработчик сообщения для админа ---
@@ -567,6 +572,7 @@ async def check_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Команда cancel ---
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     await update.message.reply_text(
         "❌ Действие отменено",
         reply_markup=InlineKeyboardMarkup([[
@@ -608,13 +614,20 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             SELECTING_GAME: [
-                CallbackQueryHandler(game_selected),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, message_to_admin_received)
+                CallbackQueryHandler(game_selected),  # Только кнопки, без MessageHandler!
             ],
-            TYPING_TEAM_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)],
-            TYPING_PLAYER_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)],
-            ASKING_LEGIONER: [CallbackQueryHandler(legioner_received)],
-            TYPING_CAPTAIN_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)],
+            TYPING_TEAM_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)
+            ],
+            TYPING_PLAYER_COUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)
+            ],
+            ASKING_LEGIONER: [
+                CallbackQueryHandler(legioner_received)
+            ],
+            TYPING_CAPTAIN_INFO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)
+            ],
             ASKING_MESSAGE_TO_ADMIN: [
                 MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received)
             ],
