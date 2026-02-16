@@ -44,14 +44,10 @@ logger = logging.getLogger(__name__)
     TYPING_CAPTAIN_INFO,
 ) = range(5)
 ASKING_GAME_NAME = range(5, 6)
-ASKING_GAME_TO_DELETE = range(6, 7)  # Новое состояние для удаления игр
+ASKING_GAME_TO_DELETE = range(6, 7)
 
-# --- URL картинки (ЗАМЕНИ НА СВОЮ ССЫЛКУ!) ---
-# Как получить ссылку:
-# 1. Отправь фото себе в Telegram (в "Избранное")
-# 2. Нажми на фото → "Копировать ссылку"
-# 3. Вставь ссылку сюда
-PHOTO_URL = "https://i.ibb.co/yBPYtBvL/photo-5233614862649332078-x.jpg" 
+# --- ТВОЯ ССЫЛКА НА ФОТО (рабочая) ---
+PHOTO_URL = "https://i.ibb.co/yBPYtBvL/photo-5233614862649332078-x.jpg"
 
 # --- Функция для получения списка админов ---
 def get_admin_ids() -> List[int]:
@@ -100,7 +96,7 @@ def save_data(data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
 
-# --- Команда /start ---
+# --- Команда /start с ИНДЕКСАМИ для кнопок (ИСПРАВЛЕНО) ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает приветствие с картинкой и список игр."""
     data = load_data()
@@ -109,11 +105,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Текст приветствия
     caption = "Привет! На связи футбольный квиз «Паненка»! На какую игру регистрируемся? 🤔"
     
-    # Создаем кнопки с играми
+    # Создаем кнопки с играми (используем ИНДЕКСЫ)
     if games:
         keyboard = []
-        for game in games:
-            callback_data = game[:50]
+        for i, game in enumerate(games):
+            # Используем индекс как callback_data (это надежно и не превышает лимит)
+            callback_data = f"game_{i}"
             keyboard.append([InlineKeyboardButton(game, callback_data=callback_data)])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -125,12 +122,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=caption,
                 reply_markup=reply_markup
             )
-            logger.info("Фото успешно отправлено")
+            logger.info("✅ Фото успешно отправлено")
         except Exception as e:
             logger.error(f"Ошибка отправки фото: {e}")
             # Если фото не отправилось, шлем просто текст
             await update.message.reply_text(
-                f"{caption}\n\n(Фото не загрузилось, проверь ссылку)",
+                caption,
                 reply_markup=reply_markup
             )
     else:
@@ -139,25 +136,50 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     return SELECTING_GAME
 
-# --- Обработчик выбора игры ---
+# --- Обработчик выбора игры (с ИНДЕКСАМИ, ИСПРАВЛЕНО) ---
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Запоминает выбранную игру и спрашивает название команды."""
     query = update.callback_query
     await query.answer()
 
-    selected_game = query.data
-    context.user_data["selected_game"] = selected_game
-
-    await query.edit_message_text(
-        text="Как называется ваша команда?"
-    )
-    return TYPING_TEAM_NAME
+    # Получаем индекс игры из callback_data
+    callback_data = query.data
+    logger.info(f"Callback data получен: {callback_data}")
+    
+    if callback_data.startswith("game_"):
+        try:
+            game_index = int(callback_data.replace("game_", ""))
+            data = load_data()
+            games = data.get("games", [])
+            
+            if 0 <= game_index < len(games):
+                selected_game = games[game_index]
+                context.user_data["selected_game"] = selected_game
+                logger.info(f"✅ Выбрана игра: {selected_game}")
+                
+                await query.edit_message_text(
+                    text="Как называется ваша команда?"
+                )
+                return TYPING_TEAM_NAME
+            else:
+                logger.error(f"Индекс игры {game_index} вне диапазона")
+                await query.edit_message_text("Ошибка: игра не найдена")
+                return ConversationHandler.END
+        except ValueError as e:
+            logger.error(f"Ошибка преобразования индекса: {e}")
+            await query.edit_message_text("Ошибка при выборе игры")
+            return ConversationHandler.END
+    else:
+        logger.error(f"Неверный формат callback_data: {callback_data}")
+        await query.edit_message_text("Ошибка: неверный формат данных")
+        return ConversationHandler.END
 
 # --- Обработчик названия команды ---
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет название команды и спрашивает количество игроков."""
     team_name = update.message.text
     context.user_data["team_name"] = team_name
+    logger.info(f"Получено название команды: {team_name}")
 
     await update.message.reply_text("Сколько человек в вашей команде?")
     return TYPING_PLAYER_COUNT
@@ -167,6 +189,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     """Сохраняет количество игроков и спрашивает про легионера."""
     player_count = update.message.text
     context.user_data["player_count"] = player_count
+    logger.info(f"Количество игроков: {player_count}")
 
     # Создаем кнопки Да/Нет
     keyboard = [
@@ -191,6 +214,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
     context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
     
     await query.edit_message_text(
         text="Супер! Напишите ФИО и номер телефона капитана (в свободной форме):"
@@ -220,7 +244,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     data = load_data()
     data["registrations"].append(registration)
     save_data(data)
-    logger.info(f"Новая регистрация: {registration}")
+    logger.info(f"✅ Новая регистрация: {registration}")
 
     # Отправляем подтверждение пользователю
     await update.message.reply_text(
@@ -246,8 +270,9 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
                 text=admin_message,
                 parse_mode="Markdown"
             )
+            logger.info(f"✅ Уведомление отправлено админу {admin_id}")
         except Exception as e:
-            logger.error(f"Не удалось отправить сообщение админу {admin_id}: {e}")
+            logger.error(f"❌ Не удалось отправить сообщение админу {admin_id}: {e}")
 
     context.user_data.clear()
     return ConversationHandler.END
@@ -276,9 +301,10 @@ async def add_game_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
 
     await update.message.reply_text(f"✅ Игра '{new_game}' успешно добавлена!")
+    logger.info(f"✅ Админ добавил игру: {new_game}")
     return ConversationHandler.END
 
-# --- Команда /delgame (удаление игры) - НОВАЯ! ---
+# --- Команда /delgame (удаление игры) ---
 async def del_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает список игр для удаления."""
     user_id = update.effective_user.id
@@ -298,7 +324,6 @@ async def del_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Создаем кнопки для каждой игры
     keyboard = []
     for i, game in enumerate(games):
-        # Используем индекс как callback_data
         callback_data = f"del_{i}"
         keyboard.append([InlineKeyboardButton(f"❌ {game}", callback_data=callback_data)])
     
@@ -322,7 +347,6 @@ async def del_game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Удаление отменено.")
         return ConversationHandler.END
     
-    # Получаем индекс игры из callback_data
     try:
         game_index = int(query.data.replace("del_", ""))
     except ValueError:
@@ -337,10 +361,35 @@ async def del_game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["games"] = games
         save_data(data)
         await query.edit_message_text(f"✅ Игра '{deleted_game}' успешно удалена!")
+        logger.info(f"✅ Админ удалил игру: {deleted_game}")
     else:
         await query.edit_message_text("Ошибка: игра не найдена.")
     
     return ConversationHandler.END
+
+# --- Команда /checkgames (проверка списка игр для админов) ---
+async def check_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Проверяет список игр."""
+    user_id = update.effective_user.id
+    admin_ids = get_admin_ids()
+    
+    if user_id not in admin_ids:
+        await update.message.reply_text("У вас нет прав на выполнение этой команды.")
+        return
+    
+    data = load_data()
+    games = data.get("games", [])
+    
+    if not games:
+        await update.message.reply_text("Список игр пуст.")
+        return
+    
+    message = "📋 *Список игр:*\n\n"
+    for i, game in enumerate(games):
+        message += f"{i}. {game}\n"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+    logger.info(f"Админ запросил список игр: {games}")
 
 # --- Команда /cancel ---
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -363,7 +412,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in get_admin_ids():
         help_text += "\n\n👑 *Команды администратора:*\n"
         help_text += "/addgame - Добавить новую игру\n"
-        help_text += "/delgame - Удалить игру"
+        help_text += "/delgame - Удалить игру\n"
+        help_text += "/checkgames - Проверить список игр"
     
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
@@ -403,7 +453,7 @@ def main():
         ],
     )
     
-    # Диалог удаления игры (НОВЫЙ)
+    # Диалог удаления игры
     del_game_conv_handler = ConversationHandler(
         entry_points=[CommandHandler("delgame", del_game_start)],
         states={
@@ -418,13 +468,15 @@ def main():
 
     # Обработчики команд вне диалогов
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("checkgames", check_games))
     application.add_handler(reg_conv_handler)
     application.add_handler(add_game_conv_handler)
-    application.add_handler(del_game_conv_handler)  # Добавляем новый обработчик
+    application.add_handler(del_game_conv_handler)
 
     print("✅ Бот запущен...")
     print(f"👑 Админы: {get_admin_ids()}")
     print(f"🖼️ Фото: {PHOTO_URL}")
+    print(f"📋 Игры: {load_data().get('games', [])}")
     
     # Запускаем polling
     application.run_polling(allowed_updates=Update.ALL_TYPES)
