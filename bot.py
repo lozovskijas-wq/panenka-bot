@@ -1,7 +1,8 @@
 import json
 import logging
 import os
-from typing import List, Dict, Any
+import sys
+from typing import Dict, Any
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,11 +15,28 @@ from telegram.ext import (
     ContextTypes,
 )
 
-import config
+# Простой способ получить токен - сначала из переменных окружения, потом из config
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+ADMIN_IDS_STR = os.environ.get('ADMIN_ID', '')
+
+# Если нет в окружении, пробуем из config.py
+if not BOT_TOKEN:
+    try:
+        import config
+        BOT_TOKEN = config.BOT_TOKEN
+        ADMIN_IDS_STR = config.ADMIN_ID
+    except ImportError:
+        print("ERROR: No BOT_TOKEN found in environment or config.py")
+        sys.exit(1)
+
+if not BOT_TOKEN:
+    print("ERROR: BOT_TOKEN is not set")
+    sys.exit(1)
 
 # Включаем логирование
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -38,15 +56,21 @@ PHOTO_URL = "https://example.com/your-image.jpg"  # ЗАМЕНИ НА РЕАЛЬ
 # --- Функция для получения списка админов ---
 def get_admin_ids():
     """Преобразует строку с ID админов в список чисел."""
-    admin_ids_str = config.ADMIN_ID
+    if not ADMIN_IDS_STR:
+        return []
+    
     # Если это строка, разделяем по запятой
-    if isinstance(admin_ids_str, str):
-        # Убираем пробелы и превращаем в числа
-        admin_ids = [int(id_str.strip()) for id_str in admin_ids_str.split(',')]
-        return admin_ids
+    if isinstance(ADMIN_IDS_STR, str):
+        try:
+            # Убираем пробелы и превращаем в числа
+            admin_ids = [int(id_str.strip()) for id_str in ADMIN_IDS_STR.split(',') if id_str.strip()]
+            return admin_ids
+        except ValueError:
+            logger.error(f"Ошибка преобразования ADMIN_ID: {ADMIN_IDS_STR}")
+            return []
     else:
         # Если это просто число (один админ)
-        return [admin_ids_str]
+        return [ADMIN_IDS_STR]
 
 # --- Работа с файлом data.json ---
 DATA_FILE = "data.json"
@@ -57,13 +81,19 @@ def load_data() -> Dict[str, Any]:
         default_data = {"games": [], "registrations": []}
         save_data(default_data)
         return default_data
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {"games": [], "registrations": []}
 
 def save_data(data: Dict[str, Any]):
     """Сохраняет данные в JSON файл."""
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        logger.error(f"Ошибка сохранения данных: {e}")
 
 # --- Команда /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -75,8 +105,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption = "Привет! На связи футбольный квиз «Паненка»! На какую игру регистрируемся? 🤔"
     
     # Создаем кнопки с играми
-    keyboard = []
     if games:
+        keyboard = []
         for game in games:
             callback_data = game[:50]
             keyboard.append([InlineKeyboardButton(game, callback_data=callback_data)])
@@ -91,7 +121,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=caption,
                 reply_markup=reply_markup
             )
-        except:
+        except Exception as e:
+            logger.error(f"Ошибка отправки фото: {e}")
             # Если фото не отправилось, шлем просто текст
             await update.message.reply_text(
                 caption,
@@ -113,7 +144,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["selected_game"] = selected_game
 
     await query.edit_message_text(
-        text=f"Как называется ваша команда?"
+        text="Как называется ваша команда?"
     )
     return TYPING_TEAM_NAME
 
@@ -248,10 +279,28 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Действие отменено.")
     return ConversationHandler.END
 
+# --- Команда /help ---
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает справку."""
+    help_text = (
+        "Доступные команды:\n"
+        "/start - Начать регистрацию на игру\n"
+        "/cancel - Отменить текущее действие\n"
+        "/help - Показать эту справку"
+    )
+    
+    # Добавляем инфо про /addgame только для админов
+    user_id = update.effective_user.id
+    if user_id in get_admin_ids():
+        help_text += "\n/addgame - Добавить новую игру (только для админов)"
+    
+    await update.message.reply_text(help_text)
+
 # --- Главная функция ---
 def main():
     """Запускает бота."""
-    application = Application.builder().token(config.BOT_TOKEN).build()
+    # Создаем приложение
+    application = Application.builder().token(BOT_TOKEN).build()
 
     # Диалог регистрации
     reg_conv_handler = ConversationHandler(
@@ -265,7 +314,8 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CommandHandler("start", start)
+            CommandHandler("start", start),
+            CommandHandler("help", help_command)
         ],
     )
 
@@ -277,14 +327,18 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CommandHandler("start", start)
+            CommandHandler("start", start),
+            CommandHandler("help", help_command)
         ],
     )
 
+    # Обработчик команды help вне диалогов
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(reg_conv_handler)
     application.add_handler(add_game_conv_handler)
 
     print("Бот запущен...")
+    # Запускаем polling
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
