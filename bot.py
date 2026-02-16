@@ -202,7 +202,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if callback_data == "contact_admin":
         await query.message.reply_text(
-            "📝 Напишите ваше сообщение для админа:\n\n(Отправьте текст, фото или голосовое сообщение)"
+            "📝 Напишите ваше сообщение для нас:\n\n(Отправьте текст, фото или голосовое сообщение)"
         )
         return ASKING_MESSAGE_TO_ADMIN
     
@@ -420,7 +420,7 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
     admin_ids = get_admin_ids()
     
     await update.message.reply_text(
-        "✅ Ваше сообщение отправлено админу!\n\nОжидайте ответа, мы свяжемся с вами в ближайшее время."
+        "✅ Ваше сообщение отправлено нам!\n\nОжидайте ответа, мы свяжемся с вами в ближайшее время."
     )
     
     welcome_text = (
@@ -500,14 +500,14 @@ async def admin_reply_from_private(update: Update, context: ContextTypes.DEFAULT
         if update.message.text:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"✉️ Ответ от администратора:\n\n{update.message.text}"
+                text=f"✉️ Ответ от организаторов:\n\n{update.message.text}"
             )
         elif update.message.photo:
             photo = update.message.photo[-1]
             await context.bot.send_photo(
                 chat_id=chat_id,
                 photo=photo.file_id,
-                caption=f"✉️ Ответ от администратора:\n\n{update.message.caption or ''}"
+                caption=f"✉️ Ответ от организаторов:\n\n{update.message.caption or ''}"
             )
         elif update.message.voice:
             await context.bot.send_voice(
@@ -700,7 +700,7 @@ def main():
     print(f"👑 Админы: {get_admin_ids()}")
     print(f"🖼️ Файл фото: {PHOTO_FILE}")
     print(f"📁 Файл существует: {os.path.exists(PHOTO_FILE)}")
-    print("📨 Сообщения админу будут приходить в ЛИЧКУ")
+    print("📨 Сообщения будут приходить в ЛИЧКУ")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
