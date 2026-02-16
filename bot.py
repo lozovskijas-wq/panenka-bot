@@ -116,7 +116,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
             callback_data = f"game_{i}"
             games_keyboard.append([InlineKeyboardButton(game, callback_data=callback_data)])
     
-    games_keyboard.append([InlineKeyboardButton("📨 Связаться с админом", callback_data="contact_admin")])
+    games_keyboard.append([InlineKeyboardButton("📨 Связаться с нами", callback_data="contact_admin")])
     
     info_keyboard = [
         [
@@ -184,7 +184,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
         "⚽️ Как пользоваться ботом:\n"
         "• Нажми на название игры, чтобы зарегистрироваться\n"
-        "• 📨 Связаться с админом - задать вопрос\n"
+        "• 📨 Связаться с нами - задать вопрос\n"
         "• ❓ Помощь - показать все команды\n"
         "• ❌ Отмена - отменить текущее действие\n\n"
         "В каком городе регистрируем команду?"
@@ -212,7 +212,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📋 Команды:\n"
             "/start - Показать главное меню\n"
             "/cancel - Отменить текущее действие\n\n"
-            "📨 Связаться с админом - задать вопрос организаторам\n\n"
+            "📨 Связаться с нами - задать вопрос организаторам\n\n"
             "⚽ Регистрация на игру:\n"
             "1. Выбери город из списка\n"
             "2. Введи название команды\n"
@@ -235,7 +235,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
             "⚽️ Как пользоваться ботом:\n"
             "• Нажми на название игры, чтобы зарегистрироваться\n"
-            "• 📨 Связаться с админом - задать вопрос\n"
+            "• 📨 Связаться с нами - задать вопрос\n"
             "• ❓ Помощь - показать все команды\n"
             "• ❌ Отмена - отменить текущее действие\n\n"
             "В каком городе регистрируем команду?"
@@ -245,7 +245,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif callback_data == "cancel_action":
         await query.message.reply_text(
-            "❌ Действие отменено. Выберите город или свяжитесь с админом.",
+            "❌ Действие отменено. Выберите город или свяжитесь с нами.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 В меню", callback_data="back_to_menu")
             ]])
@@ -427,7 +427,7 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
         "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
         "⚽️ Как пользоваться ботом:\n"
         "• Нажми на название игры, чтобы зарегистрироваться\n"
-        "• 📨 Связаться с админом - задать вопрос\n"
+        "• 📨 Связаться с нами - задать вопрос\n"
         "• ❓ Помощь - показать все команды\n"
         "• ❌ Отмена - отменить текущее действие\n\n"
         "В каком городе регистрируем команду?"
@@ -604,7 +604,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
         "⚽️ Как пользоваться ботом:\n"
         "• Нажми на название игры, чтобы зарегистрироваться\n"
-        "• 📨 Связаться с админом - задать вопрос\n"
+        "• 📨 Связаться с нами - задать вопрос\n"
         "• ❓ Помощь - показать все команды\n"
         "• ❌ Отмена - отменить текущее действие\n\n"
         "В каком городе регистрируем команду?"
@@ -618,7 +618,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📋 Команды:\n"
         "/start - Показать главное меню\n"
         "/cancel - Отменить текущее действие\n\n"
-        "📨 Связаться с админом - задать вопрос организаторам\n\n"
+        "📨 Связаться с нами - задать вопрос организаторам\n\n"
         "⚽ Регистрация на игру:\n"
         "1. Выбери город из списка\n"
         "2. Введи название команды\n"
