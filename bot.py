@@ -189,7 +189,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• 📨 Связаться с админом - задать вопрос\n"
         "• ❓ Помощь - показать все команды\n"
         "• ❌ Отмена - отменить текущее действие\n\n"
-        "🎮 Доступные игры:"
+        "⚽ Доступные игры:"
     )
     
     await send_main_menu(update, context, welcome_text)
