@@ -27,14 +27,26 @@ logger = logging.getLogger(__name__)
     SELECTING_GAME,
     TYPING_TEAM_NAME,
     TYPING_PLAYER_COUNT,
-    ASKING_LEGIONER,  # Новый状态
+    ASKING_LEGIONER,
     TYPING_CAPTAIN_INFO,
 ) = range(5)
 ASKING_GAME_NAME = range(5, 6)
 
 # --- URL картинки (замени на свою ссылку) ---
-# Можно загрузить картинку в Telegram, получить ссылку или использовать любую прямую ссылку
 PHOTO_URL = "https://example.com/your-image.jpg"  # ЗАМЕНИ НА РЕАЛЬНУЮ ССЫЛКУ!
+
+# --- Функция для получения списка админов ---
+def get_admin_ids():
+    """Преобразует строку с ID админов в список чисел."""
+    admin_ids_str = config.ADMIN_ID
+    # Если это строка, разделяем по запятой
+    if isinstance(admin_ids_str, str):
+        # Убираем пробелы и превращаем в числа
+        admin_ids = [int(id_str.strip()) for id_str in admin_ids_str.split(',')]
+        return admin_ids
+    else:
+        # Если это просто число (один админ)
+        return [admin_ids_str]
 
 # --- Работа с файлом data.json ---
 DATA_FILE = "data.json"
@@ -179,7 +191,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         "Спасибо за регистрацию, увидимся на игре ♥️😉"
     )
 
-    # Отправляем уведомление админу
+    # Отправляем уведомление ВСЕМ админам
+    admin_ids = get_admin_ids()
     admin_message = (
         f"🔔 *Новая регистрация!*\n"
         f"*Игра:* {registration['selected_game']}\n"
@@ -189,23 +202,27 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         f"*Капитан:* {registration['captain_info']}\n"
         f"*От:* {registration['full_name']} (@{registration['username']})"
     )
-    try:
-        await context.bot.send_message(
-            chat_id=config.ADMIN_ID,
-            text=admin_message,
-            parse_mode="Markdown"
-        )
-    except Exception as e:
-        logger.error(f"Не удалось отправить сообщение админу: {e}")
+    
+    for admin_id in admin_ids:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=admin_message,
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить сообщение админу {admin_id}: {e}")
 
     context.user_data.clear()
     return ConversationHandler.END
 
-# --- Команда /addgame (для админа) ---
+# --- Команда /addgame (для админов) ---
 async def add_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начинает диалог добавления игры."""
     user_id = update.effective_user.id
-    if user_id != config.ADMIN_ID:
+    admin_ids = get_admin_ids()
+    
+    if user_id not in admin_ids:
         await update.message.reply_text("У вас нет прав на выполнение этой команды.")
         return ConversationHandler.END
 
