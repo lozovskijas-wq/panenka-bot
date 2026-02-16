@@ -46,6 +46,25 @@ ASKING_GAME_TO_DELETE = range(8, 9)
 
 PHOTO_FILE = "logo.jpg"
 
+# Словарь с информацией об играх
+GAME_INFO = {
+    "Москва 28.02": {
+        "full_date": "28 февраля (суббота)",
+        "venue": "COiN HALL - ул. Пятницкая, 71/5с2 (м. Добрынинская)",
+        "time": "Двери открыты с 15:00, игра начнется в 15:30"
+    },
+    "Казань 11.03": {
+        "full_date": "11 марта (среда)",
+        "venue": "MAXIMILIAN'S - ул. Спартаковская, 6",
+        "time": "Двери открыты с 19:00, игра начнется в 19:30"
+    },
+    "Краснодар 14.03": {
+        "full_date": "14 марта (суббота)",
+        "venue": "Namesti - ул. Красноармейская 55/2",
+        "time": "Двери открыты с 16:30, игра начнется в 17:00"
+    }
+}
+
 def get_admin_ids() -> List[int]:
     admin_ids = [SPECIFIC_ADMIN_ID]
     if ADMIN_IDS_STR:
@@ -65,9 +84,9 @@ def load_data() -> Dict[str, Any]:
     if not os.path.exists(DATA_FILE):
         default_data = {
             "games": [
-                "Москва 28.02 COIN HALL",
-                "Казань 11.03 MAXIMILIAN’S",
-                "Краснодар 14.03 NAMESTi"
+                "Москва 28.02",
+                "Казань 11.03",
+                "Краснодар 14.03"
             ], 
             "registrations": [],
             "users": {}
@@ -163,13 +182,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     welcome_text = (
-        "👋 Привет! На связи футбольный квиз «Паненка»!\n\n"
-        "⚽ Как пользоваться ботом:\n"
-        "• Нажми на название игры, чтобы зарегистрироваться\n"
-        "• 📨 Связаться с админом - задать вопрос\n"
-        "• ❓ Помощь - показать все команды\n"
-        "• ❌ Отмена - отменить текущее действие\n\n"
-        "🎮 Доступные игры:"
+        "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+        "В каком городе регистрируем команду?"
     )
     
     await send_main_menu(update, context, welcome_text)
@@ -196,7 +210,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/cancel - Отменить текущее действие\n\n"
             "📨 Связаться с админом - задать вопрос организаторам\n\n"
             "⚽ Регистрация на игру:\n"
-            "1. Выбери игру из списка\n"
+            "1. Выбери город из списка\n"
             "2. Введи название команды\n"
             "3. Укажи количество игроков\n"
             "4. Ответь про легионера\n"
@@ -214,15 +228,15 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data == "back_to_menu":
         context.user_data.clear()
         welcome_text = (
-            "👋 Главное меню\n\n"
-            "⚽ Доступные игры:"
+            "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+            "В каком городе регистрируем команду?"
         )
         await send_main_menu(update, context, welcome_text)
         return SELECTING_GAME
     
     elif callback_data == "cancel_action":
         await query.message.reply_text(
-            "❌ Действие отменено. Выберите игру или свяжитесь с админом.",
+            "❌ Действие отменено. Выберите город или свяжитесь с админом.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 В меню", callback_data="back_to_menu")
             ]])
@@ -239,9 +253,18 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selected_game = games[game_index]
                 context.user_data["selected_game"] = selected_game
                 
-                await query.message.reply_text(
-                    text=f"Вы выбрали: {selected_game}\n\nКак называется ваша команда?"
+                # Получаем информацию об игре
+                game_info = GAME_INFO.get(selected_game, {})
+                
+                info_text = (
+                    f"{selected_game} - {game_info.get('full_date', '')}\n"
+                    f"{game_info.get('venue', '')}\n\n"
+                    f"{game_info.get('time', '')}\n\n"
+                    f"Стоимость участия - 800₽ с игрока в джерси любого клуба или сборной 🎽, 1000₽ — с игрока в обычной одежде\n\n"
+                    f"Напишите название своей команды 👇"
                 )
+                
+                await query.message.reply_text(info_text)
                 return TYPING_TEAM_NAME
             else:
                 await query.message.reply_text("Ошибка: игра не найдена")
@@ -264,7 +287,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data["team_name"] = team_name
     logger.info(f"Название команды: {team_name}")
     
-    await update.message.reply_text("Сколько человек в вашей команде?")
+    await update.message.reply_text("Сколько будет игроков? (от 3 до 10)")
     return TYPING_PLAYER_COUNT
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -274,11 +297,16 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     
     player_count = update.message.text.strip()
     if not player_count:
-        await update.message.reply_text("Количество игроков не может быть пустым. Введите число:")
+        await update.message.reply_text("Количество игроков не может быть пустым. Введите число от 3 до 10:")
         return TYPING_PLAYER_COUNT
     
     if not player_count.isdigit():
-        await update.message.reply_text("Пожалуйста, введите число (например: 5):")
+        await update.message.reply_text("Пожалуйста, введите число (от 3 до 10):")
+        return TYPING_PLAYER_COUNT
+    
+    count = int(player_count)
+    if count < 3 or count > 10:
+        await update.message.reply_text("Количество игроков должно быть от 3 до 10. Введите число:")
         return TYPING_PLAYER_COUNT
     
     context.user_data["player_count"] = player_count
@@ -292,7 +320,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "Готовы ли вы взять в команду легионера (человека без команды)?",
+        "Готовы ли взять в команду легионера (игрока без команды)?",
         reply_markup=reply_markup
     )
     return ASKING_LEGIONER
@@ -305,7 +333,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["legioner"] = legioner_answer
     
     await query.message.reply_text(
-        text="Супер! Напишите ФИО и номер телефона капитана (в свободной форме):"
+        text="Имя и номер телефона капитана 👇"
     )
     return TYPING_CAPTAIN_INFO
 
@@ -320,13 +348,15 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         return TYPING_CAPTAIN_INFO
     
     user = update.effective_user
+    selected_game = context.user_data.get("selected_game", "")
+    team_name = context.user_data.get("team_name", "")
 
     registration = {
         "user_id": user.id,
         "username": user.username,
         "full_name": user.full_name,
-        "selected_game": context.user_data.get("selected_game"),
-        "team_name": context.user_data.get("team_name"),
+        "selected_game": selected_game,
+        "team_name": team_name,
         "player_count": context.user_data.get("player_count"),
         "legioner": context.user_data.get("legioner", "Не указано"),
         "captain_info": captain_info,
@@ -338,9 +368,14 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"✅ Новая регистрация: {registration}")
 
+    # Получаем информацию об игре для подтверждения
+    game_info = GAME_INFO.get(selected_game, {})
+    game_date = game_info.get('full_date', selected_game)
+
     await update.message.reply_text(
-        "✅ Спасибо за регистрацию, увидимся на игре! ♥️😉\n\n"
-        "📨 Если есть вопросы - нажмите кнопку 'Связаться с админом' в главном меню.",
+        f"Команда {team_name} зарегистрирована на квиз {game_date}\n\n"
+        f"Просим приходить заранее и подготовить наличные для оплаты\n\n"
+        f"До встречи на игре ⚽️",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")
         ]])
@@ -349,12 +384,12 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     admin_ids = get_admin_ids()
     admin_message = (
         f"🔔 Новая регистрация!\n"
-        f"Игра: {registration['selected_game']}\n"
-        f"Команда: {registration['team_name']}\n"
-        f"Игроков: {registration['player_count']}\n"
-        f"Легионер: {registration['legioner']}\n"
-        f"Капитан: {registration['captain_info']}\n"
-        f"От: {registration['full_name']} (@{registration['username']})"
+        f"Игра: {selected_game}\n"
+        f"Команда: {team_name}\n"
+        f"Игроков: {context.user_data.get('player_count')}\n"
+        f"Легионер: {context.user_data.get('legioner', 'Не указано')}\n"
+        f"Капитан: {captain_info}\n"
+        f"От: {user.full_name} (@{user.username})"
     )
     
     for admin_id in admin_ids:
@@ -377,8 +412,8 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
     )
     
     welcome_text = (
-        "👋 Главное меню\n\n"
-        "⚽ Доступные игры:"
+        "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+        "В каком городе регистрируем команду?"
     )
     await send_main_menu(update, context, welcome_text)
     
@@ -485,11 +520,11 @@ async def add_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in get_admin_ids():
         await update.message.reply_text("У вас нет прав")
         return ConversationHandler.END
-    await update.message.reply_text("Введите название новой игры:")
+    await update.message.reply_text("Введите название новой игры (в формате 'Город дата'):")
     return ASKING_GAME_NAME
 
 async def add_game_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    new_game = update.message.text
+    new_game = update.message.text.strip()
     data = load_data()
     data["games"].append(new_game)
     save_data(data)
@@ -563,8 +598,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ Действие отменено"
     )
     welcome_text = (
-        "👋 Главное меню\n\n"
-        "⚽ Доступные игры:"
+        "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+        "В каком городе регистрируем команду?"
     )
     await send_main_menu(update, context, welcome_text)
     return SELECTING_GAME
@@ -577,7 +612,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/cancel - Отменить текущее действие\n\n"
         "📨 Связаться с админом - задать вопрос организаторам\n\n"
         "⚽ Регистрация на игру:\n"
-        "1. Выбери игру из списка\n"
+        "1. Выбери город из списка\n"
         "2. Введи название команды\n"
         "3. Укажи количество игроков\n"
         "4. Ответь про легионера\n"
