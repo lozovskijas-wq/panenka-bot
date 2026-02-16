@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 ASKING_GAME_NAME = range(7, 8)
 ASKING_GAME_TO_DELETE = range(8, 9)
 
-
+# --- ТВОЯ ССЫЛКА НА ФОТО ---
 PHOTO_URL = "https://i.ibb.co/yBPYtBvL/photo-5233614862649332078-x.jpg"
 
 # --- Функция для получения списка админов ---
