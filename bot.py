@@ -24,6 +24,9 @@ if sys.version_info >= (3, 12):
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_IDS_STR = os.environ.get('ADMIN_ID', '')
 
+# Добавляем конкретный ID админа
+SPECIFIC_ADMIN_ID = 286355827
+
 if not BOT_TOKEN:
     print("ERROR: BOT_TOKEN is not set")
     sys.exit(1)
@@ -53,19 +56,21 @@ PHOTO_FILE = "logo.jpg"
 
 # --- Функция для получения списка админов ---
 def get_admin_ids() -> List[int]:
-    """Преобразует строку с ID админов в список чисел."""
-    if not ADMIN_IDS_STR:
-        return []
+    """Преобразует строку с ID админов в список чисел + добавляет конкретного админа."""
+    admin_ids = [SPECIFIC_ADMIN_ID]  # Всегда добавляем конкретного админа
     
-    if isinstance(ADMIN_IDS_STR, str):
-        try:
-            admin_ids = [int(id_str.strip()) for id_str in ADMIN_IDS_STR.split(',') if id_str.strip()]
-            return admin_ids
-        except ValueError:
-            logger.error(f"Ошибка преобразования ADMIN_ID: {ADMIN_IDS_STR}")
-            return []
-    else:
-        return [ADMIN_IDS_STR]
+    if ADMIN_IDS_STR:
+        if isinstance(ADMIN_IDS_STR, str):
+            try:
+                additional_ids = [int(id_str.strip()) for id_str in ADMIN_IDS_STR.split(',') if id_str.strip()]
+                admin_ids.extend(additional_ids)
+            except ValueError:
+                logger.error(f"Ошибка преобразования ADMIN_ID: {ADMIN_IDS_STR}")
+        else:
+            admin_ids.append(ADMIN_IDS_STR)
+    
+    # Убираем дубликаты
+    return list(set(admin_ids))
 
 # --- Работа с файлом data.json ---
 DATA_FILE = "data.json"
@@ -99,9 +104,9 @@ def save_data(data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
 
-# --- Функция для отправки главного меню ---
+# --- Функция для отправки главного меню (СОХРАНЯЕТ ИСТОРИЮ) ---
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    """Отправляет фото с главным меню."""
+    """Отправляет фото с главным меню, не удаляя предыдущие сообщения."""
     data = load_data()
     games = data.get("games", [])
     
@@ -130,40 +135,45 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
     # Убираем все звездочки из текста
     clean_text = text.replace('*', '')
     
-    # Определяем, как отправлять/редактировать сообщение
-    if update.callback_query:
-        # Редактируем существующее сообщение
-        try:
-            await update.callback_query.edit_message_caption(
-                caption=clean_text,
-                reply_markup=reply_markup
-            )
-            logger.info("✅ Сообщение отредактировано")
-        except Exception as e:
-            logger.warning(f"Не удалось отредактировать caption: {e}")
-            await update.callback_query.edit_message_text(
-                text=clean_text,
-                reply_markup=reply_markup
-            )
-    else:
-        # Отправляем новое сообщение с фото
-        try:
-            if os.path.exists(PHOTO_FILE):
-                with open(PHOTO_FILE, 'rb') as photo:
+    # ВСЕГДА отправляем новое сообщение, а не редактируем старое
+    try:
+        if os.path.exists(PHOTO_FILE):
+            with open(PHOTO_FILE, 'rb') as photo:
+                if update.callback_query:
+                    # Если это callback - отправляем новое сообщение в тот же чат
+                    await update.callback_query.message.reply_photo(
+                        photo=photo,
+                        caption=clean_text,
+                        reply_markup=reply_markup
+                    )
+                else:
+                    # Если это новое сообщение
                     await update.message.reply_photo(
                         photo=photo,
                         caption=clean_text,
                         reply_markup=reply_markup
                     )
-                logger.info("✅ Фото успешно отправлено")
+            logger.info("✅ Новое сообщение с фото отправлено")
+        else:
+            logger.error(f"❌ Файл {PHOTO_FILE} не найден!")
+            if update.callback_query:
+                await update.callback_query.message.reply_text(
+                    text=f"{clean_text}\n\n(⚠️ Фото не загружено)",
+                    reply_markup=reply_markup
+                )
             else:
-                logger.error(f"❌ Файл {PHOTO_FILE} не найден!")
                 await update.message.reply_text(
                     text=f"{clean_text}\n\n(⚠️ Фото не загружено)",
                     reply_markup=reply_markup
                 )
-        except Exception as e:
-            logger.error(f"Ошибка отправки фото: {e}")
+    except Exception as e:
+        logger.error(f"Ошибка отправки фото: {e}")
+        if update.callback_query:
+            await update.callback_query.message.reply_text(
+                text=f"{clean_text}\n\n(⚠️ Ошибка загрузки фото)",
+                reply_markup=reply_markup
+            )
+        else:
             await update.message.reply_text(
                 text=f"{clean_text}\n\n(⚠️ Ошибка загрузки фото)",
                 reply_markup=reply_markup
@@ -205,8 +215,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"✅ Нажата кнопка: {callback_data}")
     
     if callback_data == "contact_admin":
-        await query.edit_message_caption(
-            caption="📝 Напишите ваше сообщение для админа:\n\n(Отправьте текст, фото или голосовое сообщение)"
+        # Отправляем новое сообщение, а не редактируем старое
+        await query.message.reply_text(
+            "📝 Напишите ваше сообщение для админа:\n\n(Отправьте текст, фото или голосовое сообщение)"
         )
         return ASKING_MESSAGE_TO_ADMIN
     
@@ -225,8 +236,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "5. Оставь контакты капитана\n\n"
             "После регистрации админ получит уведомление"
         )
-        await query.edit_message_caption(
-            caption=help_text,
+        # Отправляем новое сообщение
+        await query.message.reply_text(
+            text=help_text,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")
             ]])
@@ -236,17 +248,19 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data == "back_to_menu":
         # Очищаем данные пользователя
         context.user_data.clear()
-        # Показываем главное меню
+        # Отправляем новое главное меню
         welcome_text = (
             "👋 Главное меню\n\n"
             "⚽ Доступные игры:"
         )
+        # Используем query.message для отправки
         await send_main_menu(update, context, welcome_text)
         return SELECTING_GAME
     
     elif callback_data == "cancel_action":
-        await query.edit_message_caption(
-            caption="❌ Действие отменено. Выберите игру или свяжитесь с админом.",
+        # Отправляем новое сообщение
+        await query.message.reply_text(
+            "❌ Действие отменено. Выберите игру или свяжитесь с админом.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 В меню", callback_data="back_to_menu")
             ]])
@@ -263,28 +277,28 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selected_game = games[game_index]
                 context.user_data["selected_game"] = selected_game
                 
-                await query.edit_message_caption(
-                    caption=f"Вы выбрали: {selected_game}\n\nКак называется ваша команда?"
+                # Отправляем новое сообщение
+                await query.message.reply_text(
+                    text=f"Вы выбрали: {selected_game}\n\nКак называется ваша команда?"
                 )
                 return TYPING_TEAM_NAME
             else:
-                await query.edit_message_caption("Ошибка: игра не найдена")
+                await query.message.reply_text("Ошибка: игра не найдена")
                 return SELECTING_GAME
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
-            await query.edit_message_caption("Ошибка при выборе игры")
+            await query.message.reply_text("Ошибка при выборе игры")
             return SELECTING_GAME
 
-# --- Обработчик названия команды (поддерживает пробелы, цифры, любые символы) ---
+# --- Обработчик названия команды ---
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет название команды и спрашивает количество игроков."""
-    # Проверяем, не является ли сообщение командой
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return TYPING_TEAM_NAME
     
-    team_name = update.message.text.strip()  # Убираем лишние пробелы в начале и конце
-    if not team_name:  # Если пустая строка
+    team_name = update.message.text.strip()
+    if not team_name:
         await update.message.reply_text("Название команды не может быть пустым. Введите название:")
         return TYPING_TEAM_NAME
         
@@ -297,7 +311,6 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # --- Обработчик количества игроков ---
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет количество игроков и спрашивает про легионера."""
-    # Проверяем, не является ли сообщение командой
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return TYPING_PLAYER_COUNT
@@ -307,7 +320,6 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Количество игроков не может быть пустым. Введите число:")
         return TYPING_PLAYER_COUNT
     
-    # Проверяем, что введено число (опционально)
     if not player_count.isdigit():
         await update.message.reply_text("Пожалуйста, введите число (например: 5):")
         return TYPING_PLAYER_COUNT
@@ -337,15 +349,14 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
     context.user_data["legioner"] = legioner_answer
     
-    await query.edit_message_text(
+    await query.message.reply_text(
         text="Супер! Напишите ФИО и номер телефона капитана (в свободной форме):"
     )
     return TYPING_CAPTAIN_INFO
 
-# --- Обработчик данных капитана (поддерживает пробелы, цифры, любые символы) ---
+# --- Обработчик данных капитана ---
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет данные капитана и завершает регистрацию."""
-    # Проверяем, не является ли сообщение командой
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return TYPING_CAPTAIN_INFO
@@ -374,7 +385,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"✅ Новая регистрация: {registration}")
 
-    # Отправляем подтверждение пользователю с кнопкой возврата в меню
+    # Отправляем подтверждение пользователю
     await update.message.reply_text(
         "✅ Спасибо за регистрацию, увидимся на игре! ♥️😉\n\n"
         "📨 Если есть вопросы - нажмите кнопку 'Связаться с админом' в главном меню.",
@@ -404,17 +415,30 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception as e:
             logger.error(f"Ошибка отправки админу {admin_id}: {e}")
 
-    # Не очищаем user_data сразу, чтобы кнопка back_to_menu сработала
     return SELECTING_GAME
 
-# --- Обработчик сообщения для админа ---
+# --- Обработчик сообщения для админа (ОТПРАВЛЯЕТ В ЛИЧКУ КОНКРЕТНОМУ АДМИНУ) ---
 async def message_to_admin_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получает сообщение от пользователя и пересылает админу."""
     user = update.effective_user
     admin_ids = get_admin_ids()
     
+    # Сообщение для пользователя о том, что оно отправлено
+    await update.message.reply_text(
+        "✅ Ваше сообщение отправлено админу!\n\nОжидайте ответа, мы свяжемся с вами в ближайшее время."
+    )
+    
+    # Отправляем главное меню
+    welcome_text = (
+        "👋 Главное меню\n\n"
+        "⚽ Доступные игры:"
+    )
+    await send_main_menu(update, context, welcome_text)
+    
+    # Пересылаем сообщение всем админам
     for admin_id in admin_ids:
         try:
+            # Отправляем информацию о пользователе
             await context.bot.send_message(
                 chat_id=admin_id,
                 text=f"📨 Сообщение от пользователя\n"
@@ -424,6 +448,7 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
                      f"------------------------"
             )
             
+            # Пересылаем само сообщение
             if update.message.text:
                 await context.bot.send_message(
                     chat_id=admin_id,
@@ -442,6 +467,7 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
                     voice=update.message.voice.file_id
                 )
             
+            # Добавляем кнопку для ответа
             reply_markup = InlineKeyboardMarkup([[
                 InlineKeyboardButton(
                     "✍️ Ответить пользователю", 
@@ -458,12 +484,6 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
         except Exception as e:
             logger.error(f"Ошибка отправки сообщения админу {admin_id}: {e}")
     
-    await update.message.reply_text(
-        "✅ Ваше сообщение отправлено админу!\n\nОжидайте ответа, мы свяжемся с вами в ближайшее время.",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")
-        ]])
-    )
     return SELECTING_GAME
 
 # --- Обработчик ответа админа пользователю ---
@@ -474,7 +494,7 @@ async def admin_reply_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = int(query.data.replace("reply_to_", ""))
     context.user_data["reply_to_user"] = user_id
     
-    await query.edit_message_text(
+    await query.message.reply_text(
         text="✍️ Напишите ваш ответ пользователю:\n\n(Отправьте текст, фото или голосовое сообщение)"
     )
     return REPLYING_TO_USER
@@ -604,11 +624,14 @@ async def check_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
-        "❌ Действие отменено",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")
-        ]])
+        "❌ Действие отменено"
     )
+    # Отправляем главное меню
+    welcome_text = (
+        "👋 Главное меню\n\n"
+        "⚽ Доступные игры:"
+    )
+    await send_main_menu(update, context, welcome_text)
     return SELECTING_GAME
 
 # --- Команда help ---
@@ -647,7 +670,6 @@ def main():
                 CallbackQueryHandler(game_selected),
             ],
             TYPING_TEAM_NAME: [
-                # Убираем фильтр ~filters.COMMAND, оставляем только filters.TEXT
                 MessageHandler(filters.TEXT, team_name_received)
             ],
             TYPING_PLAYER_COUNT: [
