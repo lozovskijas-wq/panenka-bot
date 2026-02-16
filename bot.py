@@ -127,19 +127,22 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
     full_keyboard = games_keyboard + info_keyboard
     reply_markup = InlineKeyboardMarkup(full_keyboard)
     
+    # Убираем все звездочки из текста
+    clean_text = text.replace('*', '')
+    
     # Определяем, как отправлять/редактировать сообщение
     if update.callback_query:
         # Редактируем существующее сообщение
         try:
             await update.callback_query.edit_message_caption(
-                caption=text,
+                caption=clean_text,
                 reply_markup=reply_markup
             )
             logger.info("✅ Сообщение отредактировано")
         except Exception as e:
             logger.warning(f"Не удалось отредактировать caption: {e}")
             await update.callback_query.edit_message_text(
-                text=text,
+                text=clean_text,
                 reply_markup=reply_markup
             )
     else:
@@ -149,20 +152,20 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
                 with open(PHOTO_FILE, 'rb') as photo:
                     await update.message.reply_photo(
                         photo=photo,
-                        caption=text,
+                        caption=clean_text,
                         reply_markup=reply_markup
                     )
                 logger.info("✅ Фото успешно отправлено")
             else:
                 logger.error(f"❌ Файл {PHOTO_FILE} не найден!")
                 await update.message.reply_text(
-                    text=f"{text}\n\n(⚠️ Фото не загружено)",
+                    text=f"{clean_text}\n\n(⚠️ Фото не загружено)",
                     reply_markup=reply_markup
                 )
         except Exception as e:
             logger.error(f"Ошибка отправки фото: {e}")
             await update.message.reply_text(
-                text=f"{text}\n\n(⚠️ Ошибка загрузки фото)",
+                text=f"{clean_text}\n\n(⚠️ Ошибка загрузки фото)",
                 reply_markup=reply_markup
             )
 
@@ -179,7 +182,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["users"][str(user_id)] = chat_id
     save_data(data)
     
-    # Убираем звездочки, заменяем джойстик на мячик
     welcome_text = (
         "👋 Привет! На связи футбольный квиз «Паненка»!\n\n"
         "⚽ Как пользоваться ботом:\n"
@@ -215,7 +217,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/start - Показать главное меню\n"
             "/cancel - Отменить текущее действие\n\n"
             "📨 Связаться с админом - задать вопрос организаторам\n\n"
-            "🎮 Регистрация на игру:\n"
+            "⚽ Регистрация на игру:\n"
             "1. Выбери игру из списка\n"
             "2. Введи название команды\n"
             "3. Укажи количество игроков\n"
@@ -581,7 +583,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Показать главное меню\n"
         "/cancel - Отменить текущее действие\n\n"
         "📨 Связаться с админом - задать вопрос организаторам\n\n"
-        "🎮 Регистрация на игру:\n"
+        "⚽ Регистрация на игру:\n"
         "1. Выбери игру из списка\n"
         "2. Введи название команды\n"
         "3. Укажи количество игроков\n"
