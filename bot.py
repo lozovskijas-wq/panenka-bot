@@ -46,7 +46,6 @@ ASKING_GAME_TO_DELETE = range(8, 9)
 
 PHOTO_FILE = "logo.jpg"
 
-# Словарь с информацией об играх
 GAME_INFO = {
     "Москва 28.02": {
         "full_date": "28 февраля (суббота)",
@@ -182,7 +181,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+        "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
+        "⚽️ Как пользоваться ботом:\n"
+        "• Нажми на название игры, чтобы зарегистрироваться\n"
+        "• 📨 Связаться с админом - задать вопрос\n"
+        "• ❓ Помощь - показать все команды\n"
+        "• ❌ Отмена - отменить текущее действие\n\n"
         "В каком городе регистрируем команду?"
     )
     
@@ -228,7 +232,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data == "back_to_menu":
         context.user_data.clear()
         welcome_text = (
-            "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+            "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
+            "⚽️ Как пользоваться ботом:\n"
+            "• Нажми на название игры, чтобы зарегистрироваться\n"
+            "• 📨 Связаться с админом - задать вопрос\n"
+            "• ❓ Помощь - показать все команды\n"
+            "• ❌ Отмена - отменить текущее действие\n\n"
             "В каком городе регистрируем команду?"
         )
         await send_main_menu(update, context, welcome_text)
@@ -253,7 +262,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selected_game = games[game_index]
                 context.user_data["selected_game"] = selected_game
                 
-                # Получаем информацию об игре
                 game_info = GAME_INFO.get(selected_game, {})
                 
                 info_text = (
@@ -368,7 +376,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"✅ Новая регистрация: {registration}")
 
-    # Получаем информацию об игре для подтверждения
     game_info = GAME_INFO.get(selected_game, {})
     game_date = game_info.get('full_date', selected_game)
 
@@ -412,7 +419,12 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
     )
     
     welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+        "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
+        "⚽️ Как пользоваться ботом:\n"
+        "• Нажми на название игры, чтобы зарегистрироваться\n"
+        "• 📨 Связаться с админом - задать вопрос\n"
+        "• ❓ Помощь - показать все команды\n"
+        "• ❌ Отмена - отменить текущее действие\n\n"
         "В каком городе регистрируем команду?"
     )
     await send_main_menu(update, context, welcome_text)
@@ -447,13 +459,6 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
                     voice=update.message.voice.file_id
                 )
             
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text="❗️ *ВАЖНО: Чтобы ответить пользователю, просто напишите ответ на это сообщение*\n\n"
-                     "Бот автоматически перешлет ваш ответ пользователю.",
-                parse_mode="Markdown"
-            )
-            
         except Exception as e:
             logger.error(f"Ошибка отправки сообщения админу {admin_id}: {e}")
     
@@ -468,7 +473,6 @@ async def admin_reply_from_private(update: Update, context: ContextTypes.DEFAULT
         return
     
     if not update.message.reply_to_message:
-        await update.message.reply_text("Чтобы ответить пользователю, нажмите 'ответить' на его сообщение")
         return
     
     replied_text = update.message.reply_to_message.text or ""
@@ -476,7 +480,6 @@ async def admin_reply_from_private(update: Update, context: ContextTypes.DEFAULT
     import re
     user_id_match = re.search(r'ID: (\d+)', replied_text)
     if not user_id_match:
-        await update.message.reply_text("Не удалось найти ID пользователя в сообщении")
         return
     
     user_id = int(user_id_match.group(1))
@@ -486,7 +489,6 @@ async def admin_reply_from_private(update: Update, context: ContextTypes.DEFAULT
     chat_id = users.get(str(user_id))
     
     if not chat_id:
-        await update.message.reply_text("Ошибка: пользователь не найден в базе")
         return
     
     try:
@@ -598,7 +600,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ Действие отменено"
     )
     welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка»✌🏻\n"
+        "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
+        "⚽️ Как пользоваться ботом:\n"
+        "• Нажми на название игры, чтобы зарегистрироваться\n"
+        "• 📨 Связаться с админом - задать вопрос\n"
+        "• ❓ Помощь - показать все команды\n"
+        "• ❌ Отмена - отменить текущее действие\n\n"
         "В каком городе регистрируем команду?"
     )
     await send_main_menu(update, context, welcome_text)
