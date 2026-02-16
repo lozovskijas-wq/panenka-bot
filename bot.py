@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 
 if sys.version_info >= (3, 12):
-    print("❌ Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
+    print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
     sys.exit(1)
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -59,7 +59,7 @@ GAME_INFO = {
     },
     "Краснодар 14.03": {
         "full_date": "14 марта (суббота)",
-        "venue": "Namesti - ул. Красноармейская 55/2",
+        "venue": "NAMESTi - ул. Красноармейская 55/2",
         "time": "Двери открыты с 16:30, игра начнется в 17:00"
     }
 }
@@ -144,9 +144,9 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
                         caption=clean_text,
                         reply_markup=reply_markup
                     )
-            logger.info("✅ Новое сообщение с фото отправлено")
+            logger.info("Новое сообщение с фото отправлено")
         else:
-            logger.error(f"❌ Файл {PHOTO_FILE} не найден!")
+            logger.error(f"Файл {PHOTO_FILE} не найден!")
             if update.callback_query:
                 await update.callback_query.message.reply_text(
                     text=f"{clean_text}\n\n(⚠️ Фото не загружено)",
@@ -198,7 +198,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     callback_data = query.data
-    logger.info(f"✅ Нажата кнопка: {callback_data}")
+    logger.info(f"Нажата кнопка: {callback_data}")
     
     if callback_data == "contact_admin":
         await query.message.reply_text(
@@ -264,13 +264,18 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 game_info = GAME_INFO.get(selected_game, {})
                 
-                info_text = (
-                    f"{selected_game} - {game_info.get('full_date', '')}\n"
-                    f"{game_info.get('venue', '')}\n\n"
-                    f"{game_info.get('time', '')}\n\n"
-                    f"Стоимость участия - 800₽ с игрока в джерси любого клуба или сборной 🎽, 1000₽ — с игрока в обычной одежде\n\n"
-                    f"Напишите название своей команды 👇"
-                )
+                info_lines = [
+                    f"{selected_game} - {game_info.get('full_date', '')}",
+                    game_info.get('venue', ''),
+                    "",
+                    game_info.get('time', ''),
+                    "",
+                    "Стоимость участия - 800₽ с игрока в джерси любого клуба или сборной 🎽, 1000₽ — с игрока в обычной одежде",
+                    "",
+                    "Напишите название своей команды 👇"
+                ]
+                
+                info_text = "\n".join(info_lines)
                 
                 await query.message.reply_text(info_text)
                 return TYPING_TEAM_NAME
@@ -374,7 +379,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     data = load_data()
     data["registrations"].append(registration)
     save_data(data)
-    logger.info(f"✅ Новая регистрация: {registration}")
+    logger.info(f"Новая регистрация: {registration}")
 
     game_info = GAME_INFO.get(selected_game, {})
     game_date = game_info.get('full_date', selected_game)
