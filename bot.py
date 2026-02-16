@@ -510,12 +510,8 @@ async def admin_reply_from_private(update: Update, context: ContextTypes.DEFAULT
                 voice=update.message.voice.file_id
             )
         
-        await update.message.reply_text("✅ Ответ успешно отправлен пользователю!")
-        logger.info(f"✅ Админ {admin_id} ответил пользователю {user_id}")
-        
     except Exception as e:
         logger.error(f"Ошибка отправки ответа: {e}")
-        await update.message.reply_text(f"❌ Ошибка при отправке: {e}")
 
 async def add_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -700,7 +696,6 @@ def main():
     print(f"🖼️ Файл фото: {PHOTO_FILE}")
     print(f"📁 Файл существует: {os.path.exists(PHOTO_FILE)}")
     print("📨 Сообщения админу будут приходить в ЛИЧКУ")
-    print("💬 Админ отвечает прямо из личных сообщений")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

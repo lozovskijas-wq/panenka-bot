@@ -1,8 +1,9 @@
 {
     "games": [
-        "Москва 28.02 COIN HALL",
-        "Казань 11.03 MAXIMILIAN’S",
-        "Краснодар 14.03 NAMESTi"
+        "Москва 28.02",
+        "Казань 11.03",
+        "Краснодар 14.03"
     ],
-    "registrations": []
+    "registrations": [],
+    "users": {}
 }
