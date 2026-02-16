@@ -275,10 +275,19 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_caption("Ошибка при выборе игры")
             return SELECTING_GAME
 
-# --- Обработчик названия команды ---
+# --- Обработчик названия команды (поддерживает пробелы, цифры, любые символы) ---
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет название команды и спрашивает количество игроков."""
-    team_name = update.message.text
+    # Проверяем, не является ли сообщение командой
+    if update.message.text.startswith('/'):
+        await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
+        return TYPING_TEAM_NAME
+    
+    team_name = update.message.text.strip()  # Убираем лишние пробелы в начале и конце
+    if not team_name:  # Если пустая строка
+        await update.message.reply_text("Название команды не может быть пустым. Введите название:")
+        return TYPING_TEAM_NAME
+        
     context.user_data["team_name"] = team_name
     logger.info(f"Название команды: {team_name}")
     
@@ -288,7 +297,21 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # --- Обработчик количества игроков ---
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет количество игроков и спрашивает про легионера."""
-    player_count = update.message.text
+    # Проверяем, не является ли сообщение командой
+    if update.message.text.startswith('/'):
+        await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
+        return TYPING_PLAYER_COUNT
+    
+    player_count = update.message.text.strip()
+    if not player_count:
+        await update.message.reply_text("Количество игроков не может быть пустым. Введите число:")
+        return TYPING_PLAYER_COUNT
+    
+    # Проверяем, что введено число (опционально)
+    if not player_count.isdigit():
+        await update.message.reply_text("Пожалуйста, введите число (например: 5):")
+        return TYPING_PLAYER_COUNT
+    
     context.user_data["player_count"] = player_count
     
     keyboard = [
@@ -319,10 +342,19 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return TYPING_CAPTAIN_INFO
 
-# --- Обработчик данных капитана ---
+# --- Обработчик данных капитана (поддерживает пробелы, цифры, любые символы) ---
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет данные капитана и завершает регистрацию."""
-    captain_info = update.message.text
+    # Проверяем, не является ли сообщение командой
+    if update.message.text.startswith('/'):
+        await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
+        return TYPING_CAPTAIN_INFO
+    
+    captain_info = update.message.text.strip()
+    if not captain_info:
+        await update.message.reply_text("Данные капитана не могут быть пустыми. Введите ФИО и телефон:")
+        return TYPING_CAPTAIN_INFO
+    
     user = update.effective_user
 
     registration = {
@@ -373,8 +405,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
             logger.error(f"Ошибка отправки админу {admin_id}: {e}")
 
     # Не очищаем user_data сразу, чтобы кнопка back_to_menu сработала
-    # context.user_data.clear() - закомментировано
-    
     return SELECTING_GAME
 
 # --- Обработчик сообщения для админа ---
@@ -614,19 +644,20 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             SELECTING_GAME: [
-                CallbackQueryHandler(game_selected),  # Только кнопки, без MessageHandler!
+                CallbackQueryHandler(game_selected),
             ],
             TYPING_TEAM_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)
+                # Убираем фильтр ~filters.COMMAND, оставляем только filters.TEXT
+                MessageHandler(filters.TEXT, team_name_received)
             ],
             TYPING_PLAYER_COUNT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)
+                MessageHandler(filters.TEXT, player_count_received)
             ],
             ASKING_LEGIONER: [
                 CallbackQueryHandler(legioner_received)
             ],
             TYPING_CAPTAIN_INFO: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)
+                MessageHandler(filters.TEXT, captain_info_received)
             ],
             ASKING_MESSAGE_TO_ADMIN: [
                 MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received)
