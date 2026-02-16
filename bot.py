@@ -48,8 +48,8 @@ logger = logging.getLogger(__name__)
 ASKING_GAME_NAME = range(7, 8)
 ASKING_GAME_TO_DELETE = range(8, 9)
 
-# --- ТВОЯ ССЫЛКА НА ФОТО ---
-PHOTO_URL = "https://i.ibb.co/yBPYtBvL/photo-5233614862649332078-x.jpg"
+# --- ЛОКАЛЬНЫЙ ФАЙЛ С ФОТО (в той же папке что и bot.py) ---
+PHOTO_FILE = "logo.jpg"  # Убедись что файл с таким именем есть в папке!
 
 # --- Функция для получения списка админов ---
 def get_admin_ids() -> List[int]:
@@ -80,7 +80,7 @@ def load_data() -> Dict[str, Any]:
                 "Краснодар 14.03 NAMESTi"
             ], 
             "registrations": [],
-            "users": {}  # Для хранения chat_id пользователей
+            "users": {}
         }
         save_data(default_data)
         return default_data
@@ -135,20 +135,30 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
                 caption=text,
                 reply_markup=reply_markup
             )
-        except:
-            # Если не получается редактировать caption, пробуем редактировать текст
+        except Exception as e:
+            logger.warning(f"Не удалось отредактировать caption: {e}")
             await update.callback_query.edit_message_text(
                 text=text,
                 reply_markup=reply_markup
             )
     else:
-        # Отправляем новое сообщение с фото
+        # Отправляем новое сообщение с фото из ЛОКАЛЬНОГО ФАЙЛА
         try:
-            await update.message.reply_photo(
-                photo=PHOTO_URL,
-                caption=text,
-                reply_markup=reply_markup
-            )
+            # Проверяем существует ли файл
+            if os.path.exists(PHOTO_FILE):
+                with open(PHOTO_FILE, 'rb') as photo:
+                    await update.message.reply_photo(
+                        photo=photo,
+                        caption=text,
+                        reply_markup=reply_markup
+                    )
+                logger.info("✅ Фото успешно отправлено из локального файла")
+            else:
+                logger.error(f"❌ Файл {PHOTO_FILE} не найден!")
+                await update.message.reply_text(
+                    text=text,
+                    reply_markup=reply_markup
+                )
         except Exception as e:
             logger.error(f"Ошибка отправки фото: {e}")
             await update.message.reply_text(
@@ -192,7 +202,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Callback data: {callback_data}")
     
     if callback_data == "contact_admin":
-        # Переход к связи с админом
         await query.edit_message_caption(
             caption="📝 *Напишите ваше сообщение для админа:*\n\n(Отправьте текст, фото или голосовое сообщение)",
             parse_mode="Markdown"
@@ -200,7 +209,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ASKING_MESSAGE_TO_ADMIN
     
     elif callback_data == "show_help":
-        # Показываем помощь
         help_text = (
             "📋 *Доступные команды:*\n\n"
             "/start - Главное меню\n"
@@ -208,7 +216,8 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📨 *Связаться с админом* - задать вопрос\n\n"
             "👑 *Для администраторов:*\n"
             "/addgame - Добавить игру\n"
-            "/delgame - Удалить игру"
+            "/delgame - Удалить игру\n"
+            "/checkgames - Проверить список игр"
         )
         await query.edit_message_caption(
             caption=help_text,
@@ -220,7 +229,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SELECTING_GAME
     
     elif callback_data == "back_to_menu":
-        # Возврат в главное меню
         welcome_text = (
             "👋 *Главное меню*\n\n"
             "🎮 *Доступные игры:*"
@@ -277,7 +285,8 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
                      f"ID: `{user.id}`\n"
                      f"Имя: {user.full_name}\n"
                      f"Username: @{user.username}\n"
-                     f"------------------------"
+                     f"------------------------",
+                parse_mode="Markdown"
             )
             
             # Пересылаем само сообщение
@@ -388,7 +397,7 @@ async def admin_reply_sent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-# --- Обработчики регистрации (остаются теми же) ---
+# --- Обработчики регистрации ---
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет название команды и спрашивает количество игроков."""
     team_name = update.message.text
@@ -486,7 +495,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data.clear()
     return SELECTING_GAME
 
-# --- Команды админа (addgame, delgame, checkgames) ---
+# --- Команды админа ---
 async def add_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in get_admin_ids():
@@ -652,6 +661,8 @@ def main():
 
     print("✅ Бот запущен!")
     print(f"👑 Админы: {get_admin_ids()}")
+    print(f"🖼️ Файл фото: {PHOTO_FILE}")
+    print(f"📁 Файл существует: {os.path.exists(PHOTO_FILE)}")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
