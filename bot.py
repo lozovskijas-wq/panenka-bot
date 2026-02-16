@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -15,19 +15,14 @@ from telegram.ext import (
     ContextTypes,
 )
 
-# Простой способ получить токен - сначала из переменных окружения, потом из config
+# Проверка версии Python
+if sys.version_info >= (3, 12):
+    print("❌ Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
+    sys.exit(1)
+
+# Получаем токен из переменных окружения
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_IDS_STR = os.environ.get('ADMIN_ID', '')
-
-# Если нет в окружении, пробуем из config.py
-if not BOT_TOKEN:
-    try:
-        import config
-        BOT_TOKEN = config.BOT_TOKEN
-        ADMIN_IDS_STR = config.ADMIN_ID
-    except ImportError:
-        print("ERROR: No BOT_TOKEN found in environment or config.py")
-        sys.exit(1)
 
 if not BOT_TOKEN:
     print("ERROR: BOT_TOKEN is not set")
@@ -49,27 +44,29 @@ logger = logging.getLogger(__name__)
     TYPING_CAPTAIN_INFO,
 ) = range(5)
 ASKING_GAME_NAME = range(5, 6)
+ASKING_GAME_TO_DELETE = range(6, 7)  # Новое состояние для удаления игр
 
-# --- URL картинки (замени на свою ссылку) ---
-PHOTO_URL = "https://example.com/your-image.jpg"  # ЗАМЕНИ НА РЕАЛЬНУЮ ССЫЛКУ!
+# --- URL картинки (ЗАМЕНИ НА СВОЮ ССЫЛКУ!) ---
+# Как получить ссылку:
+# 1. Отправь фото себе в Telegram (в "Избранное")
+# 2. Нажми на фото → "Копировать ссылку"
+# 3. Вставь ссылку сюда
+PHOTO_URL = "https://sun1-95.userapi.com/s/v1/ig2/7HlFateYeJ6guF12pwnuMzcJ847MEoswKWybIOud5TFaIyY6KitV31TY2yZu-GeqfYG7NKAkxl-B4z-tExUV4qsI.jpg?quality=95&crop=120,120,960,960&as=32x32,48x48,72x72,108x108,160x160,240x240,360x360,480x480,540x540,640x640,720x720&ava=1"  
 
 # --- Функция для получения списка админов ---
-def get_admin_ids():
+def get_admin_ids() -> List[int]:
     """Преобразует строку с ID админов в список чисел."""
     if not ADMIN_IDS_STR:
         return []
     
-    # Если это строка, разделяем по запятой
     if isinstance(ADMIN_IDS_STR, str):
         try:
-            # Убираем пробелы и превращаем в числа
             admin_ids = [int(id_str.strip()) for id_str in ADMIN_IDS_STR.split(',') if id_str.strip()]
             return admin_ids
         except ValueError:
             logger.error(f"Ошибка преобразования ADMIN_ID: {ADMIN_IDS_STR}")
             return []
     else:
-        # Если это просто число (один админ)
         return [ADMIN_IDS_STR]
 
 # --- Работа с файлом data.json ---
@@ -78,13 +75,21 @@ DATA_FILE = "data.json"
 def load_data() -> Dict[str, Any]:
     """Загружает данные из JSON файла."""
     if not os.path.exists(DATA_FILE):
-        default_data = {"games": [], "registrations": []}
+        default_data = {
+            "games": [
+                "Москва 28.02 COIN HALL",
+                "Казань 11.03 MAXIMILIAN’S",
+                "Краснодар 14.03 NAMESTi"
+            ], 
+            "registrations": []
+        }
         save_data(default_data)
         return default_data
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except Exception as e:
+        logger.error(f"Ошибка загрузки данных: {e}")
         return {"games": [], "registrations": []}
 
 def save_data(data: Dict[str, Any]):
@@ -115,17 +120,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Отправляем фото с подписью и кнопками
         try:
-            # Пробуем отправить фото
             await update.message.reply_photo(
                 photo=PHOTO_URL,
                 caption=caption,
                 reply_markup=reply_markup
             )
+            logger.info("Фото успешно отправлено")
         except Exception as e:
             logger.error(f"Ошибка отправки фото: {e}")
             # Если фото не отправилось, шлем просто текст
             await update.message.reply_text(
-                caption,
+                f"{caption}\n\n(Фото не загрузилось, проверь ссылку)",
                 reply_markup=reply_markup
             )
     else:
@@ -247,7 +252,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data.clear()
     return ConversationHandler.END
 
-# --- Команда /addgame (для админов) ---
+# --- Команда /addgame (добавление игры) ---
 async def add_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начинает диалог добавления игры."""
     user_id = update.effective_user.id
@@ -270,7 +275,71 @@ async def add_game_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["games"].append(new_game)
     save_data(data)
 
-    await update.message.reply_text(f"Игра '{new_game}' успешно добавлена!")
+    await update.message.reply_text(f"✅ Игра '{new_game}' успешно добавлена!")
+    return ConversationHandler.END
+
+# --- Команда /delgame (удаление игры) - НОВАЯ! ---
+async def del_game_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает список игр для удаления."""
+    user_id = update.effective_user.id
+    admin_ids = get_admin_ids()
+    
+    if user_id not in admin_ids:
+        await update.message.reply_text("У вас нет прав на выполнение этой команды.")
+        return ConversationHandler.END
+
+    data = load_data()
+    games = data.get("games", [])
+    
+    if not games:
+        await update.message.reply_text("Нет игр для удаления.")
+        return ConversationHandler.END
+    
+    # Создаем кнопки для каждой игры
+    keyboard = []
+    for i, game in enumerate(games):
+        # Используем индекс как callback_data
+        callback_data = f"del_{i}"
+        keyboard.append([InlineKeyboardButton(f"❌ {game}", callback_data=callback_data)])
+    
+    # Добавляем кнопку отмены
+    keyboard.append([InlineKeyboardButton("🚫 Отмена", callback_data="del_cancel")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "Выберите игру для удаления:",
+        reply_markup=reply_markup
+    )
+    return ASKING_GAME_TO_DELETE
+
+async def del_game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Удаляет выбранную игру."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "del_cancel":
+        await query.edit_message_text("Удаление отменено.")
+        return ConversationHandler.END
+    
+    # Получаем индекс игры из callback_data
+    try:
+        game_index = int(query.data.replace("del_", ""))
+    except ValueError:
+        await query.edit_message_text("Ошибка при удалении.")
+        return ConversationHandler.END
+    
+    data = load_data()
+    games = data.get("games", [])
+    
+    if 0 <= game_index < len(games):
+        deleted_game = games.pop(game_index)
+        data["games"] = games
+        save_data(data)
+        await query.edit_message_text(f"✅ Игра '{deleted_game}' успешно удалена!")
+    else:
+        await query.edit_message_text("Ошибка: игра не найдена.")
+    
     return ConversationHandler.END
 
 # --- Команда /cancel ---
@@ -283,18 +352,20 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает справку."""
     help_text = (
-        "Доступные команды:\n"
+        "📋 *Доступные команды:*\n\n"
         "/start - Начать регистрацию на игру\n"
         "/cancel - Отменить текущее действие\n"
         "/help - Показать эту справку"
     )
     
-    # Добавляем инфо про /addgame только для админов
+    # Добавляем инфо про админские команды
     user_id = update.effective_user.id
     if user_id in get_admin_ids():
-        help_text += "\n/addgame - Добавить новую игру (только для админов)"
+        help_text += "\n\n👑 *Команды администратора:*\n"
+        help_text += "/addgame - Добавить новую игру\n"
+        help_text += "/delgame - Удалить игру"
     
-    await update.message.reply_text(help_text)
+    await update.message.reply_text(help_text, parse_mode="Markdown")
 
 # --- Главная функция ---
 def main():
@@ -331,13 +402,30 @@ def main():
             CommandHandler("help", help_command)
         ],
     )
+    
+    # Диалог удаления игры (НОВЫЙ)
+    del_game_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("delgame", del_game_start)],
+        states={
+            ASKING_GAME_TO_DELETE: [CallbackQueryHandler(del_game_selected)],
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("start", start),
+            CommandHandler("help", help_command)
+        ],
+    )
 
-    # Обработчик команды help вне диалогов
+    # Обработчики команд вне диалогов
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(reg_conv_handler)
     application.add_handler(add_game_conv_handler)
+    application.add_handler(del_game_conv_handler)  # Добавляем новый обработчик
 
-    print("Бот запущен...")
+    print("✅ Бот запущен...")
+    print(f"👑 Админы: {get_admin_ids()}")
+    print(f"🖼️ Фото: {PHOTO_URL}")
+    
     # Запускаем polling
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
