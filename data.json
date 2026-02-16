@@ -1,0 +1,27 @@
+{
+    "games": [
+        "Москва 28.02 Coin Hall",
+        "Казань 11.03 Maximilians",
+        "Краснодар 14.03 Намести"
+    ],
+    "registrations": [
+        {
+            "user_id": 1323001282,
+            "username": "AndreyLozovsky",
+            "full_name": "Андрей",
+            "selected_game": "Москва 28.02 Coin Hall",
+            "team_name": "папугаи",
+            "player_count": "4",
+            "captain_info": "Лозовский Андрей Сергеевич 89773107616"
+        },
+        {
+            "user_id": 286355827,
+            "username": "Pablisco",
+            "full_name": "Павел Федоренко",
+            "selected_game": "Москва 28.02 Coin Hall",
+            "team_name": "Паненка",
+            "player_count": "8",
+            "captain_info": "Павел \n8977898778"
+        }
+    ]
+}
