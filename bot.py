@@ -51,7 +51,7 @@ ASKING_GAME_TO_DELETE = range(6, 7)  # Новое состояние для уд
 # 1. Отправь фото себе в Telegram (в "Избранное")
 # 2. Нажми на фото → "Копировать ссылку"
 # 3. Вставь ссылку сюда
-PHOTO_URL = "https://sun1-95.userapi.com/s/v1/ig2/7HlFateYeJ6guF12pwnuMzcJ847MEoswKWybIOud5TFaIyY6KitV31TY2yZu-GeqfYG7NKAkxl-B4z-tExUV4qsI.jpg?quality=95&crop=120,120,960,960&as=32x32,48x48,72x72,108x108,160x160,240x240,360x360,480x480,540x540,640x640,720x720&ava=1"  
+PHOTO_URL = "https://i.ibb.co/yBPYtBvL/photo-5233614862649332078-x.jpg" 
 
 # --- Функция для получения списка админов ---
 def get_admin_ids() -> List[int]:
