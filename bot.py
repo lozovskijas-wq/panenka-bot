@@ -3,6 +3,9 @@ import logging
 import os
 import sys
 import time
+import asyncio
+import requests
+from threading import Thread
 from typing import Dict, Any, List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,6 +17,17 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
+from flask import Flask
+
+# Flask веб-сервер для пинга
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Бот работает! Время: " + time.strftime("%Y-%m-%d %H:%M:%S")
+
+def run_web():
+    app.run(host='0.0.0.0', port=10000)
 
 if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
@@ -617,6 +631,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def main():
+    # Запускаем веб-сервер в отдельном потоке
+    Thread(target=run_web, daemon=True).start()
+    logger.info("🌐 Веб-сервер запущен на порту 10000")
+
     application = Application.builder().token(BOT_TOKEN).build()
 
     reg_conv_handler = ConversationHandler(
@@ -682,7 +700,7 @@ def main():
     print(f"🖼️ Файл фото: {PHOTO_FILE}")
     print(f"📁 Файл существует: {os.path.exists(PHOTO_FILE)}")
     print("📨 Сообщения будут приходить в ЛИЧКУ")
-    print("⏱️ Polling настроен для стабильной работы на Render")
+    print("🌐 Веб-сервер активен на / - бот не уснет!")
     
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
