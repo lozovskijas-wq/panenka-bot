@@ -684,7 +684,6 @@ def main():
     print("📨 Сообщения будут приходить в ЛИЧКУ")
     print("⏱️ Polling настроен для стабильной работы на Render")
     
-    # Оптимизированный polling для Render
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
         timeout=30,
