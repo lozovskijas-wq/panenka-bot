@@ -21,7 +21,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Бот работает! Время: " + time.strftime("%Y-%m-%d %H:%M:%S")
+    return "OK"
 
 def run_web():
     app.run(host='0.0.0.0', port=10000)
