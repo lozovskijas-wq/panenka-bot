@@ -3,8 +3,6 @@ import logging
 import os
 import sys
 import time
-import asyncio
-import requests
 from threading import Thread
 from typing import Dict, Any, List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -19,7 +17,6 @@ from telegram.ext import (
 )
 from flask import Flask
 
-# Flask веб-сервер для пинга
 app = Flask('')
 
 @app.route('/')
@@ -631,7 +628,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def main():
-    # Запускаем веб-сервер в отдельном потоке
     Thread(target=run_web, daemon=True).start()
     logger.info("🌐 Веб-сервер запущен на порту 10000")
 
