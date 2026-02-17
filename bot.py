@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+import time
 from typing import Dict, Any, List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -569,120 +570,4 @@ async def del_game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def check_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in get_admin_ids():
-        await update.message.reply_text("У вас нет прав")
-        return
-    
-    data = load_data()
-    games = data.get("games", [])
-    message = "📋 Список игр:\n\n"
-    for i, game in enumerate(games):
-        message += f"{i}. {game}\n"
-    await update.message.reply_text(message)
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    await update.message.reply_text(
-        "❌ Действие отменено"
-    )
-    welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
-        "В каком городе регистрируем команду?"
-    )
-    await send_main_menu(update, context, welcome_text)
-    return SELECTING_GAME
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = (
-        "❓ Помощь по боту:\n\n"
-        "📋 Команды:\n"
-        "/start - Показать главное меню\n"
-        "/cancel - Отменить текущее действие\n\n"
-        "📨 Связаться с нами - задать вопрос организаторам\n\n"
-        "⚽ Регистрация на игру:\n"
-        "1. Выбери город из списка\n"
-        "2. Введи название команды\n"
-        "3. Укажи количество игроков\n"
-        "4. Ответь про легионера\n"
-        "5. Оставь контакты капитана\n\n"
-        "После регистрации админ получит уведомление"
-    )
-    
-    await update.message.reply_text(
-        help_text,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")
-        ]])
-    )
-
-def main():
-    application = Application.builder().token(BOT_TOKEN).build()
-
-    reg_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            SELECTING_GAME: [
-                CallbackQueryHandler(game_selected),
-            ],
-            TYPING_TEAM_NAME: [
-                MessageHandler(filters.TEXT, team_name_received)
-            ],
-            TYPING_PLAYER_COUNT: [
-                MessageHandler(filters.TEXT, player_count_received)
-            ],
-            ASKING_LEGIONER: [
-                CallbackQueryHandler(legioner_received)
-            ],
-            TYPING_CAPTAIN_INFO: [
-                MessageHandler(filters.TEXT, captain_info_received)
-            ],
-            ASKING_MESSAGE_TO_ADMIN: [
-                MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received)
-            ],
-            REPLYING_TO_USER: [],
-        },
-        fallbacks=[
-            CommandHandler("cancel", cancel),
-            CommandHandler("start", start),
-            CommandHandler("help", help_command),
-            CallbackQueryHandler(game_selected, pattern="^back_to_menu$")
-        ],
-    )
-
-    add_game_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("addgame", add_game_start)],
-        states={
-            ASKING_GAME_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_game_received)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    
-    del_game_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("delgame", del_game_start)],
-        states={
-            ASKING_GAME_TO_DELETE: [CallbackQueryHandler(del_game_selected)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-
-    application.add_handler(MessageHandler(
-        filters.TEXT | filters.PHOTO | filters.VOICE, 
-        admin_reply_from_private
-    ), group=1)
-
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("checkgames", check_games))
-    application.add_handler(reg_conv_handler)
-    application.add_handler(add_game_conv_handler)
-    application.add_handler(del_game_conv_handler)
-
-    print("✅ Бот запущен!")
-    print(f"👑 Админы: {get_admin_ids()}")
-    print(f"🖼️ Файл фото: {PHOTO_FILE}")
-    print(f"📁 Файл существует: {os.path.exists(PHOTO_FILE)}")
-    print("📨 Сообщения будут приходить в ЛИЧКУ")
-    
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
+    if
