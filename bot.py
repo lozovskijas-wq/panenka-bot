@@ -3,8 +3,13 @@ import logging
 import os
 import sys
 import time
+import base64
+import requests
+import gspread
 from threading import Thread
+from datetime import datetime
 from typing import Dict, Any, List
+from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -30,9 +35,20 @@ if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
     sys.exit(1)
 
+if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
+    try:
+        creds_base64 = os.environ.get('GOOGLE_CREDENTIALS_BASE64')
+        creds_json = base64.b64decode(creds_base64).decode('utf-8')
+        with open('credentials.json', 'w') as f:
+            f.write(creds_json)
+        print("✅ credentials.json восстановлен из переменной окружения")
+    except Exception as e:
+        print(f"❌ Ошибка восстановления credentials.json: {e}")
+
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_IDS_STR = os.environ.get('ADMIN_ID', '')
 SPECIFIC_ADMIN_ID = 286355827
+SPREADSHEET_ID = "1PCGcpWlACOpvs90NjKenKu8lhPF1aoMpUUp6SBlLGXM"
 
 if not BOT_TOKEN:
     print("ERROR: BOT_TOKEN is not set")
@@ -117,6 +133,33 @@ def save_data(data: Dict[str, Any]):
             json.dump(data, f, ensure_ascii=False, indent=4)
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
+
+def save_to_google_sheets(registration: Dict[str, Any]):
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_file = "credentials.json"
+        if os.path.exists(creds_file):
+            creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+            client = gspread.authorize(creds)
+            sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+            now = datetime.now()
+            row = [
+                now.strftime("%Y-%m-%d"),
+                now.strftime("%H:%M"),
+                registration.get('selected_game', ''),
+                registration.get('team_name', ''),
+                registration.get('player_count', ''),
+                registration.get('legioner', ''),
+                registration.get('captain_info', ''),
+                registration.get('username', ''),
+                str(registration.get('user_id', ''))
+            ]
+            sheet.append_row(row)
+            logger.info(f"✅ Данные сохранены в Google Sheets: {registration.get('team_name')}")
+        else:
+            logger.warning(f"Файл credentials.json не найден")
+    except Exception as e:
+        logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     data = load_data()
@@ -226,7 +269,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "3. Укажи количество игроков\n"
             "4. Ответь про легионера\n"
             "5. Оставь контакты капитана\n\n"
-            "После регистрации админ получит уведомление"
+            "После регистрации данные автоматически попадут в таблицу"
         )
         await query.message.reply_text(
             text=help_text,
@@ -382,6 +425,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     data["registrations"].append(registration)
     save_data(data)
     logger.info(f"Новая регистрация: {registration}")
+
+    save_to_google_sheets(registration)
 
     game_info = GAME_INFO.get(selected_game, {})
     game_date = game_info.get('full_date', selected_game)
@@ -617,7 +662,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3. Укажи количество игроков\n"
         "4. Ответь про легионера\n"
         "5. Оставь контакты капитана\n\n"
-        "После регистрации админ получит уведомление"
+        "После регистрации данные автоматически попадут в таблицу"
     )
     
     await update.message.reply_text(
@@ -697,6 +742,7 @@ def main():
     print(f"📁 Файл существует: {os.path.exists(PHOTO_FILE)}")
     print("📨 Сообщения будут приходить в ЛИЧКУ")
     print("🌐 Веб-сервер активен на / - бот не уснет!")
+    print("📊 Данные будут сохраняться в Google Sheets")
     
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
