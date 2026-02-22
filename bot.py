@@ -899,21 +899,28 @@ def main():
                 CallbackQueryHandler(game_selected)
             ],
             ASKING_CLIENT_ID: [
-                MessageHandler(filters.TEXT, client_id_received)
+                MessageHandler(filters.TEXT, client_id_received),
+                CallbackQueryHandler(game_selected)
             ],
             ASKING_BET_NUMBER: [
-                MessageHandler(filters.TEXT, bet_number_received)
+                MessageHandler(filters.TEXT, bet_number_received),
+                CallbackQueryHandler(game_selected)
             ],
             ASKING_ACTION_NAME: [
-                MessageHandler(filters.TEXT, action_name_received)
+                MessageHandler(filters.TEXT, action_name_received),
+                CallbackQueryHandler(game_selected)
             ],
             ASKING_ACTION_PHONE: [
-                MessageHandler(filters.TEXT, action_phone_received)
+                MessageHandler(filters.TEXT, action_phone_received),
+                CallbackQueryHandler(game_selected)
             ],
             ASKING_MESSAGE_TO_ADMIN: [
-                MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received)
+                MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received),
+                CallbackQueryHandler(game_selected)
             ],
-            REPLYING_TO_USER: [],
+            REPLYING_TO_USER: [
+                CallbackQueryHandler(game_selected)
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
