@@ -364,6 +364,15 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return SHOWING_ACTION_MENU
     
+    elif callback_data == "back_to_main_from_promo":
+        context.user_data.clear()
+        welcome_text = (
+            "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
+            "В каком городе регистрируем команду?"
+        )
+        await send_main_menu(update, context, welcome_text)
+        return SELECTING_GAME
+    
     elif callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -482,6 +491,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     user = update.effective_user
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
+    game_info = GAME_INFO.get(selected_game, {})
+    game_date = game_info.get('full_date', selected_game)
 
     registration = {
         "user_id": user.id,
@@ -502,17 +513,19 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"Новая регистрация: {registration}")
 
-    game_info = GAME_INFO.get(selected_game, {})
-    game_date = game_info.get('full_date', selected_game)
-
-    await update.message.reply_text(
-        f"Команда {team_name} зарегистрирована на квиз {game_date}\n\n"
-        f"Просим приходить заранее и подготовить наличные для оплаты\n\n"
-        f"До встречи на игре ⚽️",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_menu")
-        ]])
+    final_message = (
+        f"Спасибо за регистрацию! Ваша команда ({team_name}) зарегистрирована на игру ({game_date}). "
+        f"Вы можете принять участие в акции от FONBET, и прийти на квиз бесплатно!"
     )
+    
+    keyboard = [
+        [InlineKeyboardButton("🎁 Участвовать в акции", callback_data="join_promo")],
+        [InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")],
+        [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(final_message, reply_markup=reply_markup)
 
     admin_ids = get_admin_ids()
     admin_message = (
