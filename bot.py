@@ -491,8 +491,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     user = update.effective_user
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
-    game_info = GAME_INFO.get(selected_game, {})
-    game_date = game_info.get('full_date', selected_game)
 
     registration = {
         "user_id": user.id,
@@ -514,7 +512,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"Новая регистрация: {registration}")
 
     final_message = (
-        f"Спасибо за регистрацию! Ваша команда ({team_name}) зарегистрирована на игру ({game_date}). "
+        f"Спасибо за регистрацию! Ваша команда ({team_name}) зарегистрирована на игру ({selected_game}). "
         f"Вы можете принять участие в акции от FONBET, и прийти на квиз бесплатно!"
     )
     
