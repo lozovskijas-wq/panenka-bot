@@ -364,14 +364,20 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return SHOWING_ACTION_MENU
     
-    elif callback_data == "back_to_main_from_promo":
-        context.user_data.clear()
-        welcome_text = (
-            "Привет! На связи футбольный квиз «Паненка»✌🏻\n\n"
-            "В каком городе регистрируем команду?"
+    elif callback_data == "join_promo_from_final":
+        promo_text = (
+            "В акции принимают участие пари от 700₽, сделанные в период с 23.02.2026 по 12.03.2026\n\n"
+            "Ваша команда уже зарегистрирована?"
         )
-        await send_main_menu(update, context, welcome_text)
-        return SELECTING_GAME
+        keyboard = [
+            [
+                InlineKeyboardButton("Да", callback_data="promo_yes"),
+                InlineKeyboardButton("Нет", callback_data="promo_no")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text(promo_text, reply_markup=reply_markup)
+        return ASKING_ACTION_TEAM
     
     elif callback_data.startswith("game_"):
         try:
@@ -517,7 +523,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     )
     
     keyboard = [
-        [InlineKeyboardButton("🎁 Участвовать в акции", callback_data="join_promo")],
+        [InlineKeyboardButton("🎁 Участвовать в акции", callback_data="join_promo_from_final")],
         [InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")],
         [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
     ]
