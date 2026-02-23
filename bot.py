@@ -900,35 +900,35 @@ def main():
                 CallbackQueryHandler(game_selected),
             ],
             TYPING_TEAM_NAME: [
-                MessageHandler(filters.TEXT, team_name_received)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)
             ],
             TYPING_PLAYER_COUNT: [
-                MessageHandler(filters.TEXT, player_count_received)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)
             ],
             ASKING_LEGIONER: [
                 CallbackQueryHandler(legioner_received)
             ],
             TYPING_CAPTAIN_INFO: [
-                MessageHandler(filters.TEXT, captain_info_received)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)
             ],
             ASKING_ACTION_TEAM: [
-                MessageHandler(filters.TEXT, action_team_received),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, action_team_received),
                 CallbackQueryHandler(game_selected)
             ],
             ASKING_CLIENT_ID: [
-                MessageHandler(filters.TEXT, client_id_received),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
                 CallbackQueryHandler(game_selected)
             ],
             ASKING_BET_NUMBER: [
-                MessageHandler(filters.TEXT, bet_number_received),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
                 CallbackQueryHandler(game_selected)
             ],
             ASKING_ACTION_NAME: [
-                MessageHandler(filters.TEXT, action_name_received),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, action_name_received),
                 CallbackQueryHandler(game_selected)
             ],
             ASKING_ACTION_PHONE: [
-                MessageHandler(filters.TEXT, action_phone_received),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, action_phone_received),
                 CallbackQueryHandler(game_selected)
             ],
             ASKING_MESSAGE_TO_ADMIN: [
