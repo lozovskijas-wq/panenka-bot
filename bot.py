@@ -10,7 +10,7 @@ from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -209,33 +209,20 @@ async def send_city_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, ga
     photo_file = game_info.get('photo')
     
     try:
-        if os.path.exists(photo_file):
-            with open(photo_file, 'rb') as photo:
-                if update.callback_query:
-                    await update.callback_query.message.reply_photo(
-                        photo=photo,
-                        caption=caption,
-                        reply_markup=reply_markup
-                    )
-                else:
-                    await update.message.reply_photo(
-                        photo=photo,
-                        caption=caption,
-                        reply_markup=reply_markup
-                    )
-            logger.info(f"Фото для {game_key} отправлено")
-        else:
-            logger.error(f"Файл {photo_file} не найден!")
+        with open(photo_file, 'rb') as photo:
             if update.callback_query:
-                await update.callback_query.message.reply_text(
-                    text=caption,
+                await update.callback_query.message.reply_photo(
+                    photo=photo,
+                    caption=caption,
                     reply_markup=reply_markup
                 )
             else:
-                await update.message.reply_text(
-                    text=caption,
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=caption,
                     reply_markup=reply_markup
                 )
+        logger.info(f"Фото для {game_key} отправлено")
     except Exception as e:
         logger.error(f"Ошибка отправки фото: {e}")
         if update.callback_query:
@@ -263,6 +250,22 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
     clean_text = text.replace('*', '')
     
     try:
+        with open('logo.jpg', 'rb') as photo:
+            if update.callback_query:
+                await update.callback_query.message.reply_photo(
+                    photo=photo,
+                    caption=clean_text,
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=clean_text,
+                    reply_markup=reply_markup
+                )
+        logger.info("Главное меню с фото отправлено")
+    except Exception as e:
+        logger.error(f"Ошибка отправки фото: {e}")
         if update.callback_query:
             await update.callback_query.message.reply_text(
                 text=clean_text,
@@ -273,8 +276,6 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
                 text=clean_text,
                 reply_markup=reply_markup
             )
-    except Exception as e:
-        logger.error(f"Ошибка отправки меню: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
