@@ -317,9 +317,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+        "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
         "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
-        "Выберите город и дату 🌍"
+        "Выберите город и дату 👇"
     )
     
     await update.message.reply_text(welcome_text)
@@ -338,9 +338,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if callback_data == "back_to_main":
         context.user_data.clear()
         welcome_text = (
-            "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+            "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
             "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
-            "Выберите город и дату 🌍"
+            "Выберите город и дату 👇"
         )
         await send_main_menu(update, context, welcome_text)
         return SELECTING_GAME
@@ -934,9 +934,9 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
     )
     
     welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+        "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
         "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
-        "Выберите город и дату 🌍"
+        "Выберите город и дату 👇"
     )
     await send_main_menu(update, context, welcome_text)
     
