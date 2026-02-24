@@ -362,9 +362,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SHOWING_TERMS_MENU
     
     elif callback_data == "help":
-        await query.message.reply_text(
+        help_text = (
             "❓ Есть вопрос?\n\n"
-            "Напишите его прямо здесь — поможем разобраться.",
+            "Напишите его сюда @Panenka_Registration — поможем разобраться."
+        )
+        await query.message.reply_text(
+            help_text,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
             ]])
@@ -575,6 +578,8 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return TYPING_TEAM_NAME
@@ -585,12 +590,14 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return TYPING_TEAM_NAME
         
     context.user_data["team_name"] = team_name
-    logger.info(f"Название команды: {team_name}")
+    logger.info(f"Название команды сохранено: {team_name}")
     
     await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
     return TYPING_PLAYER_COUNT
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНО КОЛИЧЕСТВО: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return TYPING_PLAYER_COUNT
@@ -610,6 +617,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         return TYPING_PLAYER_COUNT
     
     context.user_data["player_count"] = player_count
+    logger.info(f"Количество сохранено: {player_count}")
     
     keyboard = [
         [
@@ -631,6 +639,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
     context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
     
     await query.message.reply_text(
         text="Напишите имя и номер телефона капитана 👇"
@@ -638,6 +647,8 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return TYPING_CAPTAIN_INFO
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНЫ ДАННЫЕ КАПИТАНА: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return TYPING_CAPTAIN_INFO
@@ -720,6 +731,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return SELECTING_GAME
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ ДЛЯ АКЦИИ: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return ASKING_PROMO_TEAM
@@ -730,6 +743,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ASKING_PROMO_TEAM
     
     context.user_data["promo_team"] = team_name
+    logger.info(f"Название команды для акции сохранено: {team_name}")
     
     selected_game = context.user_data.get("selected_game")
     game_info = GAME_INFO.get(selected_game, {})
@@ -748,6 +762,8 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ASKING_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН ID КЛИЕНТА: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите ID клиента.")
         return ASKING_CLIENT_ID
@@ -758,6 +774,8 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ASKING_CLIENT_ID
     
     context.user_data["client_id"] = client_id
+    logger.info(f"ID клиента сохранен: {client_id}")
+    
     await update.message.reply_text(
         "Введите номер пари.\n"
         "Посмотреть можно в разделе «Мои пари» 👇"
@@ -765,6 +783,8 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ASKING_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН НОМЕР ПАРИ: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите номер пари.")
         return ASKING_BET_NUMBER
@@ -775,10 +795,14 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ASKING_BET_NUMBER
     
     context.user_data["bet_number"] = bet_number
+    logger.info(f"Номер пари сохранен: {bet_number}")
+    
     await update.message.reply_text("Напишите имя и номер телефона 👇")
     return ASKING_PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН ТЕЛЕФОН: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите имя и телефон.")
         return ASKING_PROMO_PHONE
@@ -857,6 +881,8 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return SELECTING_GAME
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН ВОПРОС: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return ASKING_HELP_MESSAGE
@@ -864,6 +890,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     help_text = update.message.text.strip()
     user = update.effective_user
     
+    # Отправляем подтверждение пользователю
     await update.message.reply_text(
         "✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.",
         reply_markup=InlineKeyboardMarkup([[
