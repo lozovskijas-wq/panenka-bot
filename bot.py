@@ -322,10 +322,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выберите город и дату 👇"
     )
     
-    await update.message.reply_text(welcome_text)
-    
-    # Показываем главное меню с выбором города
-    await send_main_menu(update, context, "")
+    # Показываем главное меню с фото и кнопками - ОДНО сообщение
+    await send_main_menu(update, context, welcome_text)
     return SELECTING_GAME
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
