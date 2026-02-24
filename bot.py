@@ -576,6 +576,8 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Добавляем логирование для отладки
+    print(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ: {update.message.text}")
     logger.info(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -588,12 +590,14 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return TYPING_TEAM_NAME
         
     context.user_data["team_name"] = team_name
+    print(f"Название команды сохранено: {team_name}")
     logger.info(f"Название команды сохранено: {team_name}")
     
     await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
     return TYPING_PLAYER_COUNT
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕНО КОЛИЧЕСТВО: {update.message.text}")
     logger.info(f"ПОЛУЧЕНО КОЛИЧЕСТВО: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -615,6 +619,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         return TYPING_PLAYER_COUNT
     
     context.user_data["player_count"] = player_count
+    print(f"Количество сохранено: {player_count}")
     logger.info(f"Количество сохранено: {player_count}")
     
     keyboard = [
@@ -637,6 +642,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
     context.user_data["legioner"] = legioner_answer
+    print(f"Легионер: {legioner_answer}")
     logger.info(f"Легионер: {legioner_answer}")
     
     await query.message.reply_text(
@@ -645,6 +651,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return TYPING_CAPTAIN_INFO
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕНЫ ДАННЫЕ КАПИТАНА: {update.message.text}")
     logger.info(f"ПОЛУЧЕНЫ ДАННЫЕ КАПИТАНА: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -679,6 +686,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         data["registrations"] = []
     data["registrations"].append(registration)
     save_data(data)
+    print(f"Новая регистрация: {registration}")
     logger.info(f"Новая регистрация: {registration}")
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
@@ -729,6 +737,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return SELECTING_GAME
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ ДЛЯ АКЦИИ: {update.message.text}")
     logger.info(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ ДЛЯ АКЦИИ: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -741,6 +750,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ASKING_PROMO_TEAM
     
     context.user_data["promo_team"] = team_name
+    print(f"Название команды для акции сохранено: {team_name}")
     logger.info(f"Название команды для акции сохранено: {team_name}")
     
     selected_game = context.user_data.get("selected_game")
@@ -760,6 +770,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ASKING_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕН ID КЛИЕНТА: {update.message.text}")
     logger.info(f"ПОЛУЧЕН ID КЛИЕНТА: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -772,6 +783,7 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ASKING_CLIENT_ID
     
     context.user_data["client_id"] = client_id
+    print(f"ID клиента сохранен: {client_id}")
     logger.info(f"ID клиента сохранен: {client_id}")
     
     await update.message.reply_text(
@@ -781,6 +793,7 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ASKING_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕН НОМЕР ПАРИ: {update.message.text}")
     logger.info(f"ПОЛУЧЕН НОМЕР ПАРИ: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -793,12 +806,14 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ASKING_BET_NUMBER
     
     context.user_data["bet_number"] = bet_number
+    print(f"Номер пари сохранен: {bet_number}")
     logger.info(f"Номер пари сохранен: {bet_number}")
     
     await update.message.reply_text("Напишите имя и номер телефона 👇")
     return ASKING_PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕН ТЕЛЕФОН: {update.message.text}")
     logger.info(f"ПОЛУЧЕН ТЕЛЕФОН: {update.message.text}")
     
     if update.message.text.startswith('/'):
@@ -833,6 +848,7 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
         data["promo_registrations"] = []
     data["promo_registrations"].append(promo_registration)
     save_data(data)
+    print(f"Новое участие в акции: {promo_registration}")
     logger.info(f"Новое участие в акции: {promo_registration}")
 
     save_to_google_sheets(promo_registration)
@@ -879,6 +895,7 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return SELECTING_GAME
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"ПОЛУЧЕН ВОПРОС: {update.message.text}")
     logger.info(f"ПОЛУЧЕН ВОПРОС: {update.message.text}")
     
     if update.message.text.startswith('/'):
