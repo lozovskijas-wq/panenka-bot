@@ -464,10 +464,8 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Если команда ещё не заявлена – сейчас самое время это сделать."
         )
         keyboard = [
-            [
-                InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration"),
-                InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")
-            ],
+            [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
+            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
             [
                 InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms"),
                 InlineKeyboardButton("❓ Помощь", callback_data="help")
@@ -490,10 +488,8 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Если команда ещё не заявлена – сейчас самое время это сделать."
         )
         keyboard = [
-            [
-                InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration"),
-                InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")
-            ],
+            [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
+            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
             [
                 InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms"),
                 InlineKeyboardButton("❓ Помощь", callback_data="help")
@@ -680,10 +676,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
             f"Если кто-то из игроков хочет пойти бесплатно — можно оформить участие по ставке прямо здесь 👇"
         )
         keyboard = [
-            [
-                InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration"),
-                InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")
-            ],
+            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
+            [InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")],
             [
                 InlineKeyboardButton("❓ Помощь", callback_data="help"),
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
@@ -696,10 +690,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
             f"Если кто-то из игроков хочет пойти бесплатно — можно оформить участие по ставке прямо здесь 👇"
         )
         keyboard = [
-            [
-                InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration"),
-                InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")
-            ],
+            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
+            [InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")],
             [
                 InlineKeyboardButton("❓ Помощь", callback_data="help"),
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
