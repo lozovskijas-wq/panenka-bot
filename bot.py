@@ -87,12 +87,11 @@ logger = logging.getLogger(__name__)
     ASKING_PROMO_TEAM,
     ASKING_CLIENT_ID,
     ASKING_BET_NUMBER,
-    ASKING_PROMO_NAME,
     ASKING_PROMO_PHONE,
     ASKING_HELP_MESSAGE,
-) = range(17)
-ASKING_GAME_NAME = range(17, 18)
-ASKING_GAME_TO_DELETE = range(18, 19)
+) = range(16)
+ASKING_GAME_NAME = range(16, 17)
+ASKING_GAME_TO_DELETE = range(17, 18)
 
 PHOTO_MOSCOW = "photo1.jpg"
 PHOTO_KAZAN = "photo2.jpg"
@@ -318,17 +317,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     welcome_text = (
-        "👋 Добро пожаловать в бот футбольного квиза «Паненка»!\n\n"
-        "Этот бот поможет вашей команде зарегистрироваться на ближайший квиз "
-        "и принять участие в акции от FONBET.\n\n"
-        "Нажмите кнопку /start в любой момент, чтобы начать заново."
+        "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+        "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
+        "Выберите город и дату 🌍"
     )
     
     await update.message.reply_text(welcome_text)
     
     # Показываем главное меню с выбором города
-    menu_text = "Выберите город и дату 👇"
-    await send_main_menu(update, context, menu_text)
+    await send_main_menu(update, context, "")
     return SELECTING_GAME
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -340,7 +337,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if callback_data == "back_to_main":
         context.user_data.clear()
-        await send_main_menu(update, context, "Выберите город и дату 👇")
+        welcome_text = (
+            "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+            "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
+            "Выберите город и дату 🌍"
+        )
+        await send_main_menu(update, context, welcome_text)
         return SELECTING_GAME
     
     elif callback_data == "back_to_city":
@@ -388,9 +390,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         city_part = city_name.split()[0] if city_name else ""
         
         welcome_texts = {
-            "Москва": f"Отлично ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 28 февраля. Введите название команды 👇",
-            "Казань": f"Давайте зарегистрируем команду на игру в Казани — 11 марта. Введите название команды 👇",
-            "Краснодар": f"Отлично ✌🏻\n\nДавайте зарегистрируем команду на игру в Краснодаре – 14 марта.\n\nВведите название команды 👇"
+            "Москва": f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 28 февраля.\n\nВведите название команды 👇",
+            "Казань": f"Давайте зарегистрируем команду на игру в Казани — 11 марта.\n\nВведите название команды 👇",
+            "Краснодар": f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Краснодаре – 14 марта.\n\nВведите название команды 👇"
         }
         
         await query.message.reply_text(welcome_texts.get(city_part, "Введите название команды 👇"))
@@ -573,6 +575,8 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return TYPING_TEAM_NAME
@@ -583,12 +587,14 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return TYPING_TEAM_NAME
         
     context.user_data["team_name"] = team_name
-    logger.info(f"Название команды: {team_name}")
+    logger.info(f"Название команды сохранено: {team_name}")
     
     await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
     return TYPING_PLAYER_COUNT
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНО КОЛИЧЕСТВО: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return TYPING_PLAYER_COUNT
@@ -608,6 +614,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         return TYPING_PLAYER_COUNT
     
     context.user_data["player_count"] = player_count
+    logger.info(f"Количество сохранено: {player_count}")
     
     keyboard = [
         [
@@ -629,6 +636,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
     context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
     
     await query.message.reply_text(
         text="Напишите имя и номер телефона капитана 👇"
@@ -636,6 +644,8 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return TYPING_CAPTAIN_INFO
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНЫ ДАННЫЕ КАПИТАНА: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return TYPING_CAPTAIN_INFO
@@ -732,6 +742,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return SELECTING_GAME
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕНО НАЗВАНИЕ КОМАНДЫ ДЛЯ АКЦИИ: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return ASKING_PROMO_TEAM
@@ -742,6 +754,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ASKING_PROMO_TEAM
     
     context.user_data["promo_team"] = team_name
+    logger.info(f"Название команды для акции сохранено: {team_name}")
     
     selected_game = context.user_data.get("selected_game")
     game_info = GAME_INFO.get(selected_game, {})
@@ -760,6 +773,8 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ASKING_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН ID КЛИЕНТА: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите ID клиента.")
         return ASKING_CLIENT_ID
@@ -770,6 +785,8 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ASKING_CLIENT_ID
     
     context.user_data["client_id"] = client_id
+    logger.info(f"ID клиента сохранен: {client_id}")
+    
     await update.message.reply_text(
         "Введите номер пари.\n"
         "Посмотреть можно в разделе «Мои пари» 👇"
@@ -777,6 +794,8 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ASKING_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН НОМЕР ПАРИ: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите номер пари.")
         return ASKING_BET_NUMBER
@@ -787,10 +806,14 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ASKING_BET_NUMBER
     
     context.user_data["bet_number"] = bet_number
+    logger.info(f"Номер пари сохранен: {bet_number}")
+    
     await update.message.reply_text("Напишите имя и номер телефона 👇")
     return ASKING_PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН ТЕЛЕФОН: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите имя и телефон.")
         return ASKING_PROMO_PHONE
@@ -869,6 +892,8 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return SELECTING_GAME
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"ПОЛУЧЕН ВОПРОС: {update.message.text}")
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return ASKING_HELP_MESSAGE
@@ -908,7 +933,12 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
         "✅ Ваше сообщение отправлено нам!\n\nОжидайте ответа, мы свяжемся с вами в ближайшее время."
     )
     
-    await send_main_menu(update, context, "Выберите город и дату 👇")
+    welcome_text = (
+        "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+        "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
+        "Выберите город и дату 🌍"
+    )
+    await send_main_menu(update, context, welcome_text)
     
     for admin_id in admin_ids:
         try:
@@ -1076,7 +1106,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "❌ Действие отменено"
     )
-    await send_main_menu(update, context, "Выберите город и дату 👇")
+    welcome_text = (
+        "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+        "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
+        "Выберите город и дату 🌍"
+    )
+    await send_main_menu(update, context, welcome_text)
     return SELECTING_GAME
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
