@@ -644,7 +644,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(final_message, reply_markup=reply_markup)
 
-    # Отправка уведомления админам
     registration_admin_ids = get_registration_admin_ids()
     admin_message = (
         f"🔔 Новая регистрация!\n"
@@ -874,10 +873,10 @@ def main():
             entry_points=[CommandHandler("start", start)],
             states={
                 MAIN_MENU: [
-                    CallbackQueryHandler(game_selected, pattern="^(game_|back_to_main|help|promo_terms|register_team|start_promo_registration)$"),
+                    CallbackQueryHandler(game_selected),
                 ],
                 CITY_SELECTED: [
-                    CallbackQueryHandler(game_selected, pattern="^(back_to_main|back_to_city|start_registration|start_promo_registration|promo_terms|help|promo_yes|promo_no|register_team)$"),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
@@ -886,7 +885,7 @@ def main():
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
                 ],
                 REGISTER_LEGIONER: [
-                    CallbackQueryHandler(legioner_received, pattern="^(legioner_yes|legioner_no)$"),
+                    CallbackQueryHandler(legioner_received),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
@@ -910,7 +909,6 @@ def main():
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
-                CallbackQueryHandler(game_selected, pattern="^back_to_main$")
             ],
         )
 
