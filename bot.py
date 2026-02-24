@@ -80,13 +80,12 @@ logger = logging.getLogger(__name__)
     REGISTER_PLAYERS,
     REGISTER_LEGIONER,
     REGISTER_CAPTAIN,
-    PROMO_CHECK,
     PROMO_TEAM,
     PROMO_CLIENT_ID,
     PROMO_BET_NUMBER,
     PROMO_PHONE,
     HELP_MESSAGE,
-) = range(12)
+) = range(11)
 
 PHOTO_MOSCOW = "photo1.jpg"
 PHOTO_KAZAN = "photo2.jpg"
@@ -241,6 +240,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption=welcome_text,
                     reply_markup=reply_markup
                 )
+                await update.callback_query.message.delete()
             else:
                 await update.message.reply_photo(
                     photo=photo,
@@ -253,6 +253,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text=welcome_text,
                 reply_markup=reply_markup
             )
+            await update.callback_query.message.delete()
         else:
             await update.message.reply_text(
                 text=welcome_text,
@@ -303,11 +304,13 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
             ]])
         )
+        await query.message.delete()
         return HELP_MESSAGE
     
     # Обработка акции
     elif callback_data == "promo_yes":
         await query.message.reply_text("Из какой вы команды?")
+        await query.message.delete()
         return PROMO_TEAM
     
     elif callback_data == "promo_no":
@@ -318,10 +321,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("📄 Заявить команду", callback_data="register_team")
             ]])
         )
+        await query.message.delete()
         return CITY_SELECTED
     
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
+        await query.message.delete()
         return REGISTER_TEAM
     
     elif callback_data == "start_registration":
@@ -335,6 +340,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         
         await query.message.reply_text(welcome_texts.get(city_part, "Введите название команды 👇"))
+        await query.message.delete()
         return REGISTER_TEAM
     
     elif callback_data == "start_promo_registration":
@@ -354,6 +360,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.message.reply_text(promo_text, reply_markup=reply_markup)
+        await query.message.delete()
         return CITY_SELECTED
     
     elif callback_data == "promo_terms":
@@ -466,6 +473,7 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=menu_text,
                 reply_markup=reply_markup
             )
+            await query.message.delete()
     else:
         await query.message.reply_text("Ошибка загрузки фото")
     
@@ -507,6 +515,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
+    await query.message.delete()
     return CITY_SELECTED
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -579,6 +588,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         text="Напишите имя и номер телефона капитана 👇"
     )
+    await query.message.delete()
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -837,7 +847,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
             InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
         ]])
     )
-    
+
     help_admin_ids = get_help_admin_ids()
     for admin_id in help_admin_ids:
         try:
@@ -880,39 +890,30 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
             },
             fallbacks=[
