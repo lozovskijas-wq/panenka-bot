@@ -250,20 +250,33 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
     clean_text = text.replace('*', '')
     
     try:
-        with open('logo.jpg', 'rb') as photo:
+        if os.path.exists('logo.jpg'):
+            with open('logo.jpg', 'rb') as photo:
+                if update.callback_query:
+                    await update.callback_query.message.reply_photo(
+                        photo=photo,
+                        caption=clean_text,
+                        reply_markup=reply_markup
+                    )
+                else:
+                    await update.message.reply_photo(
+                        photo=photo,
+                        caption=clean_text,
+                        reply_markup=reply_markup
+                    )
+            logger.info("Главное меню с фото отправлено")
+        else:
+            logger.warning("Файл logo.jpg не найден, отправляем без фото")
             if update.callback_query:
-                await update.callback_query.message.reply_photo(
-                    photo=photo,
-                    caption=clean_text,
+                await update.callback_query.message.reply_text(
+                    text=clean_text,
                     reply_markup=reply_markup
                 )
             else:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=clean_text,
+                await update.message.reply_text(
+                    text=clean_text,
                     reply_markup=reply_markup
                 )
-        logger.info("Главное меню с фото отправлено")
     except Exception as e:
         logger.error(f"Ошибка отправки фото: {e}")
         if update.callback_query:
@@ -315,18 +328,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_city_menu(update, context)
         return SHOWING_CITY_MENU
     
-    elif callback_data == "back_to_register":
-        await show_register_menu(update, context)
-        return SHOWING_REGISTER_MENU
-    
-    elif callback_data == "back_to_promo":
-        await show_promo_menu(update, context)
-        return SHOWING_PROMO_MENU
-    
-    elif callback_data == "back_to_terms":
-        await show_terms_menu(update, context)
-        return SHOWING_TERMS_MENU
-    
     elif callback_data == "register_team":
         await show_register_menu(update, context)
         return SHOWING_REGISTER_MENU
@@ -354,7 +355,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ASKING_PROMO_TEAM
     
     elif callback_data == "promo_no":
-        game_info = GAME_INFO.get(context.user_data.get("selected_game"), {})
         await query.message.reply_text(
             "Сначала необходимо зарегистрировать команду.\n\n"
             "После этого вы сможете оформить участие по ставке.",
@@ -365,7 +365,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SHOWING_CITY_MENU
     
     elif callback_data == "start_registration":
-        game_info = GAME_INFO.get(context.user_data.get("selected_game"), {})
         city_name = context.user_data.get("selected_game", "")
         city_part = city_name.split()[0]
         
@@ -463,7 +462,7 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
         ]
     
-    else:
+    else:  # Краснодар
         menu_text = (
             f"Краснодар – 14 марта (суббота)\n\n"
             f"{game_info['venue_short']}\n"
@@ -491,16 +490,11 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_register_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    selected_game = context.user_data.get("selected_game")
-    game_info = GAME_INFO.get(selected_game, {})
-    
     await query.message.reply_text("Введите название команды:")
     return TYPING_TEAM_NAME
 
 async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    selected_game = context.user_data.get("selected_game")
-    game_info = GAME_INFO.get(selected_game, {})
     
     promo_text = (
         "Участие по ставке оформляется для одного игрока.\n\n"
@@ -521,16 +515,14 @@ async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    selected_game = context.user_data.get("selected_game")
-    game_info = GAME_INFO.get(selected_game, {})
     
     terms_text = (
         "📋 Условия участия по ставке\n\n"
         "1. Минимальная сумма пари - 700₽.\n"
         "2. Тип пари - ординар, коэффициент - от 1.5 до 3\n"
-        f"3. Пари должно быть заключено в период:\n"
-        f"   — Казань: с 24 февраля по 10 марта\n"
-        f"   — Краснодар: с 24 февраля по 13 марта\n\n"
+        "3. Пари должно быть заключено в период:\n"
+        "   — Казань: с 24 февраля по 10 марта\n"
+        "   — Краснодар: с 24 февраля по 13 марта\n\n"
         "4. Бесплатное участие предоставляется только игроку, с аккаунта которого было заключено пари.\n"
         "5. Для оформления необходимо указать:\n"
         "   — ID клиента\n"
@@ -629,7 +621,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
     game_info = GAME_INFO.get(selected_game, {})
-    city_name = selected_game.split()[0]
+    city_name = selected_game.split()[0] if selected_game else ""
 
     registration = {
         "user_id": user.id,
@@ -651,18 +643,18 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"Новая регистрация: {registration}")
 
     venue_short = game_info.get('venue_short', '')
-    city_texts = {
-        "Москва": f"Команда зарегистрирована. Ждем вас в субботу в {venue_short}",
-        "Казань": "Команда зарегистрирована.",
-        "Краснодар": "Команда зарегистрирована."
-    }
     
-    final_message = city_texts.get(city_name, "Команда зарегистрирована.")
-    
-    if city_name == "Казань" or city_name == "Краснодар":
-        final_message += "\n\nМы свяжемся с капитаном при необходимости.\n\n"
-        final_message += "Если кто-то из игроков хочет пойти бесплатно — можно оформить участие по ставке прямо здесь"
-        
+    if city_name == "Москва":
+        final_message = f"Команда зарегистрирована. Ждем вас в субботу в {venue_short}\n\nМы свяжемся с капитаном при необходимости."
+        keyboard = [
+            [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
+        ]
+    else:
+        final_message = (
+            f"Команда зарегистрирована.\n\n"
+            f"Мы свяжемся с капитаном при необходимости.\n\n"
+            f"Если кто-то из игроков хочет пойти бесплатно — можно оформить участие по ставке прямо здесь"
+        )
         keyboard = [
             [
                 InlineKeyboardButton("Прийти по ставке", callback_data="start_promo_registration"),
@@ -673,14 +665,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
             ]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-    else:
-        final_message += "\n\nМы свяжемся с капитаном при необходимости."
-        keyboard = [
-            [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_main")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
     
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(final_message, reply_markup=reply_markup)
 
     registration_admin_ids = get_registration_admin_ids()
@@ -802,12 +788,14 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     save_to_google_sheets(promo_registration)
 
     venue_short = game_info.get('venue_short', '')
-    city_name = selected_game.split()[0]
+    city_name = selected_game.split()[0] if selected_game else ""
     
     if city_name == "Казань":
         final_text = f"Участие по ставке подтверждено.\n\nЖдём вас 11 марта в {venue_short}.\nДо встречи на квизе!"
-    else:
+    elif city_name == "Краснодар":
         final_text = f"Участие по ставке подтверждено.\n\nЖдём вас 14 марта в баре Namesti.\nДо встречи на квизе!"
+    else:
+        final_text = "Участие по ставке подтверждено.\n\nДо встречи на квизе!"
     
     await update.message.reply_text(
         final_text,
