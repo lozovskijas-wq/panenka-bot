@@ -373,7 +373,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
-        city_part = city_name.split()[0]
+        city_part = city_name.split()[0] if city_name else ""
         
         welcome_texts = {
             "Москва": f"Отлично ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 28 февраля. Введите название команды 👇",
@@ -507,8 +507,6 @@ async def show_register_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    selected_game = context.user_data.get("selected_game")
-    game_info = GAME_INFO.get(selected_game, {})
     
     promo_text = (
         "🎟️ Участие по ставке предоставляется игроку, с аккаунта которого было заключено пари\n\n"
@@ -662,7 +660,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"Новая регистрация: {registration}")
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
-    city_prepositional = game_info.get('city_prepositional', '')
     
     if city_name == "Москва":
         final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_prepositional}\n\nМы свяжемся с капитаном при необходимости."
