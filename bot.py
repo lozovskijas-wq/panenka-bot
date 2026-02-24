@@ -12,7 +12,7 @@ from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -324,14 +324,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Нажмите кнопку /start в любой момент, чтобы начать заново."
     )
     
-    # Создаем клавиатуру с кнопкой Start
-    keyboard = [[KeyboardButton("/start")]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    await update.message.reply_text(welcome_text)
     
     # Показываем главное меню с выбором города
-    await send_main_menu(update, context, "Выберите город и дату 👇")
+    menu_text = "Выберите город и дату 👇"
+    await send_main_menu(update, context, menu_text)
     return SELECTING_GAME
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
