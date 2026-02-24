@@ -1107,9 +1107,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ Действие отменено"
     )
     welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка» 🎉\n\n"
+        "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
         "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
-        "Выберите город и дату 🌍"
+        "Выберите город и дату 👇"
     )
     await send_main_menu(update, context, welcome_text)
     return SELECTING_GAME
