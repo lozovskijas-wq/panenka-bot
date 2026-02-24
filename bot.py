@@ -6,6 +6,8 @@ import time
 import base64
 import requests
 import gspread
+import asyncio
+import signal
 from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
@@ -21,6 +23,14 @@ from telegram.ext import (
     ContextTypes,
 )
 from flask import Flask
+
+# Обработка сигналов для корректного завершения
+def signal_handler(sig, frame):
+    print('Остановка бота...')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 app = Flask('')
 
@@ -528,7 +538,6 @@ async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     selected_game = context.user_data.get("selected_game")
-    game_info = GAME_INFO.get(selected_game, {})
     
     if selected_game == "Казань 11.03":
         period_text = "с 24 февраля по 10 марта"
@@ -800,7 +809,7 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
         "full_name": user.full_name,
         "selected_game": selected_game,
         "team_name": team_name,
-        "name": context.user_data.get("name", user.full_name),
+        "name": user.full_name,
         "phone": phone_info,
         "client_id": context.user_data.get("client_id"),
         "bet_number": context.user_data.get("bet_number"),
@@ -1098,118 +1107,123 @@ def main():
     Thread(target=run_web, daemon=True).start()
     logger.info("🌐 Веб-сервер запущен на порту 10000")
 
-    application = Application.builder().token(BOT_TOKEN).build()
+    try:
+        application = Application.builder().token(BOT_TOKEN).build()
 
-    reg_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            SELECTING_GAME: [
-                CallbackQueryHandler(game_selected),
+        reg_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("start", start)],
+            states={
+                SELECTING_GAME: [
+                    CallbackQueryHandler(game_selected),
+                ],
+                SHOWING_CITY_MENU: [
+                    CallbackQueryHandler(game_selected),
+                ],
+                SHOWING_REGISTER_MENU: [
+                    CallbackQueryHandler(game_selected),
+                ],
+                SHOWING_PROMO_MENU: [
+                    CallbackQueryHandler(game_selected),
+                ],
+                SHOWING_TERMS_MENU: [
+                    CallbackQueryHandler(game_selected),
+                ],
+                TYPING_TEAM_NAME: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)
+                ],
+                TYPING_PLAYER_COUNT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)
+                ],
+                ASKING_LEGIONER: [
+                    CallbackQueryHandler(legioner_received)
+                ],
+                TYPING_CAPTAIN_INFO: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)
+                ],
+                ASKING_PROMO_TEAM: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
+                    CallbackQueryHandler(game_selected)
+                ],
+                ASKING_CLIENT_ID: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
+                    CallbackQueryHandler(game_selected)
+                ],
+                ASKING_BET_NUMBER: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
+                    CallbackQueryHandler(game_selected)
+                ],
+                ASKING_PROMO_PHONE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
+                    CallbackQueryHandler(game_selected)
+                ],
+                ASKING_HELP_MESSAGE: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected)
+                ],
+                ASKING_MESSAGE_TO_ADMIN: [
+                    MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received),
+                    CallbackQueryHandler(game_selected)
+                ],
+                REPLYING_TO_USER: [
+                    CallbackQueryHandler(game_selected)
+                ],
+            },
+            fallbacks=[
+                CommandHandler("cancel", cancel),
+                CommandHandler("start", start),
+                CommandHandler("help", help_command),
+                CallbackQueryHandler(game_selected, pattern="^back_to_main$")
             ],
-            SHOWING_CITY_MENU: [
-                CallbackQueryHandler(game_selected),
-            ],
-            SHOWING_REGISTER_MENU: [
-                CallbackQueryHandler(game_selected),
-            ],
-            SHOWING_PROMO_MENU: [
-                CallbackQueryHandler(game_selected),
-            ],
-            SHOWING_TERMS_MENU: [
-                CallbackQueryHandler(game_selected),
-            ],
-            TYPING_TEAM_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)
-            ],
-            TYPING_PLAYER_COUNT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)
-            ],
-            ASKING_LEGIONER: [
-                CallbackQueryHandler(legioner_received)
-            ],
-            TYPING_CAPTAIN_INFO: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)
-            ],
-            ASKING_PROMO_TEAM: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
-                CallbackQueryHandler(game_selected)
-            ],
-            ASKING_CLIENT_ID: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
-                CallbackQueryHandler(game_selected)
-            ],
-            ASKING_BET_NUMBER: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
-                CallbackQueryHandler(game_selected)
-            ],
-            ASKING_PROMO_PHONE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
-                CallbackQueryHandler(game_selected)
-            ],
-            ASKING_HELP_MESSAGE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                CallbackQueryHandler(game_selected)
-            ],
-            ASKING_MESSAGE_TO_ADMIN: [
-                MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_to_admin_received),
-                CallbackQueryHandler(game_selected)
-            ],
-            REPLYING_TO_USER: [
-                CallbackQueryHandler(game_selected)
-            ],
-        },
-        fallbacks=[
-            CommandHandler("cancel", cancel),
-            CommandHandler("start", start),
-            CommandHandler("help", help_command),
-            CallbackQueryHandler(game_selected, pattern="^back_to_main$")
-        ],
-    )
+        )
 
-    add_game_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("addgame", add_game_start)],
-        states={
-            ASKING_GAME_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_game_received)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    
-    del_game_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("delgame", del_game_start)],
-        states={
-            ASKING_GAME_TO_DELETE: [CallbackQueryHandler(del_game_selected)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
+        add_game_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("addgame", add_game_start)],
+            states={
+                ASKING_GAME_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_game_received)],
+            },
+            fallbacks=[CommandHandler("cancel", cancel)],
+        )
+        
+        del_game_conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("delgame", del_game_start)],
+            states={
+                ASKING_GAME_TO_DELETE: [CallbackQueryHandler(del_game_selected)],
+            },
+            fallbacks=[CommandHandler("cancel", cancel)],
+        )
 
-    application.add_handler(MessageHandler(
-        filters.TEXT | filters.PHOTO | filters.VOICE, 
-        admin_reply_from_private
-    ), group=1)
+        application.add_handler(MessageHandler(
+            filters.TEXT | filters.PHOTO | filters.VOICE, 
+            admin_reply_from_private
+        ), group=1)
 
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("checkgames", check_games))
-    application.add_handler(reg_conv_handler)
-    application.add_handler(add_game_conv_handler)
-    application.add_handler(del_game_conv_handler)
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("checkgames", check_games))
+        application.add_handler(reg_conv_handler)
+        application.add_handler(add_game_conv_handler)
+        application.add_handler(del_game_conv_handler)
 
-    print("✅ Бот запущен!")
-    print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
-    print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
-    print(f"🖼️ Фото Москвы: {PHOTO_MOSCOW}")
-    print(f"🖼️ Фото Казани: {PHOTO_KAZAN}")
-    print(f"🖼️ Фото Краснодара: {PHOTO_KRASNODAR}")
-    print(f"📁 Файлы существуют: {os.path.exists(PHOTO_MOSCOW)} {os.path.exists(PHOTO_KAZAN)} {os.path.exists(PHOTO_KRASNODAR)}")
-    print("📨 Сообщения будут приходить в ЛИЧКУ")
-    print("🌐 Веб-сервер активен на / - бот не уснет!")
-    print("📊 Данные акции будут сохраняться в Google Sheets")
-    
-    application.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        timeout=30,
-        drop_pending_updates=True,
-        poll_interval=1.0
-    )
+        print("✅ Бот запущен!")
+        print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
+        print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
+        print(f"🖼️ Фото Москвы: {PHOTO_MOSCOW}")
+        print(f"🖼️ Фото Казани: {PHOTO_KAZAN}")
+        print(f"🖼️ Фото Краснодара: {PHOTO_KRASNODAR}")
+        print(f"📁 Файлы существуют: {os.path.exists(PHOTO_MOSCOW)} {os.path.exists(PHOTO_KAZAN)} {os.path.exists(PHOTO_KRASNODAR)}")
+        print("📨 Сообщения будут приходить в ЛИЧКУ")
+        print("🌐 Веб-сервер активен на / - бот не уснет!")
+        print("📊 Данные акции будут сохраняться в Google Sheets")
+        
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            timeout=30,
+            drop_pending_updates=True,
+            poll_interval=1.0
+        )
+    except Exception as e:
+        logger.error(f"Критическая ошибка: {e}")
+        time.sleep(5)
+        os.execl(sys.executable, sys.executable, *sys.argv)
 
 if __name__ == "__main__":
     try:
