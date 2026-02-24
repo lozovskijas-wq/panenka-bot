@@ -12,7 +12,7 @@ from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -318,11 +318,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     welcome_text = (
-        "Привет ✌🏻 На связи футбольный квиз «Паненка»\n\n"
-        "Этот бот поможет вашей команде попасть на ближайший квиз. Выберите город и дату 👇"
+        "👋 Добро пожаловать в бот футбольного квиза «Паненка»!\n\n"
+        "Этот бот поможет вашей команде зарегистрироваться на ближайший квиз "
+        "и принять участие в акции от FONBET.\n\n"
+        "Нажмите кнопку /start в любой момент, чтобы начать заново."
     )
     
-    await send_main_menu(update, context, welcome_text)
+    # Создаем клавиатуру с кнопкой Start
+    keyboard = [[KeyboardButton("/start")]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    
+    # Показываем главное меню с выбором города
+    await send_main_menu(update, context, "Выберите город и дату 👇")
     return SELECTING_GAME
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -334,11 +343,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if callback_data == "back_to_main":
         context.user_data.clear()
-        welcome_text = (
-            "Привет ✌🏻 На связи футбольный квиз «Паненка»\n\n"
-            "Этот бот поможет вашей команде попасть на ближайший квиз. Выберите город и дату 👇"
-        )
-        await send_main_menu(update, context, welcome_text)
+        await send_main_menu(update, context, "Выберите город и дату 👇")
         return SELECTING_GAME
     
     elif callback_data == "back_to_city":
@@ -906,11 +911,7 @@ async def message_to_admin_received(update: Update, context: ContextTypes.DEFAUL
         "✅ Ваше сообщение отправлено нам!\n\nОжидайте ответа, мы свяжемся с вами в ближайшее время."
     )
     
-    welcome_text = (
-        "Привет ✌🏻 На связи футбольный квиз «Паненка»\n\n"
-        "Этот бот поможет вашей команде попасть на ближайший квиз. Выберите город и дату 👇"
-    )
-    await send_main_menu(update, context, welcome_text)
+    await send_main_menu(update, context, "Выберите город и дату 👇")
     
     for admin_id in admin_ids:
         try:
@@ -1078,11 +1079,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "❌ Действие отменено"
     )
-    welcome_text = (
-        "Привет ✌🏻 На связи футбольный квиз «Паненка»\n\n"
-        "Этот бот поможет вашей команде попасть на ближайший квиз. Выберите город и дату 👇"
-    )
-    await send_main_menu(update, context, welcome_text)
+    await send_main_menu(update, context, "Выберите город и дату 👇")
     return SELECTING_GAME
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
