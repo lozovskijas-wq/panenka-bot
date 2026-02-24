@@ -98,12 +98,14 @@ GAME_INFO = {
         "price_jersey": "800₽",
         "price_regular": "1000₽",
         "city": "Москве",
+        "city_prepositional": "Москве",
+        "venue_prepositional": "COiN HALL",
         "photo": PHOTO_MOSCOW,
         "has_promo": False
     },
     "Казань 11.03": {
         "full_date": "11 марта (среда)",
-        "venue_short": "MAXIMILIAN'S",
+        "venue_short": "Ресторан MAXIMILIAN'S",
         "venue_full": "ул. Спартаковская, 6",
         "time_open": "19:00",
         "time_start": "19:30",
@@ -112,6 +114,8 @@ GAME_INFO = {
         "promo_period": "с 24 февраля по 10 марта",
         "promo_deadline": "10 марта",
         "city": "Казани",
+        "city_prepositional": "Казани",
+        "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
         "has_promo": True
     },
@@ -126,6 +130,8 @@ GAME_INFO = {
         "promo_period": "с 24 февраля по 13 марта",
         "promo_deadline": "13 марта",
         "city": "Краснодаре",
+        "city_prepositional": "Краснодаре",
+        "venue_prepositional": "баре Namesti",
         "photo": PHOTO_KRASNODAR,
         "has_promo": True
     }
@@ -356,7 +362,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ASKING_PROMO_TEAM
     
     elif callback_data == "promo_no":
-        game_info = GAME_INFO.get(context.user_data.get("selected_game"), {})
         await query.message.reply_text(
             "Сначала необходимо зарегистрировать команду. 👇\n\n"
             "После этого вы сможете оформить участие по ставке.",
@@ -381,7 +386,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif callback_data == "start_promo_registration":
         promo_text = (
-            "🎟️ Участие по ставке оформляется для одного игрока.\n\n"
+            "🎟️ Участие по ставке предоставляется игроку, с аккаунта которого было заключено пари\n\n"
             "Ваша команда уже зарегистрирована?"
         )
         keyboard = [
@@ -510,7 +515,7 @@ async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game_info = GAME_INFO.get(selected_game, {})
     
     promo_text = (
-        "🎟️ Участие по ставке оформляется для одного игрока.\n\n"
+        "🎟️ Участие по ставке предоставляется игроку, с аккаунта которого было заключено пари\n\n"
         "Ваша команда уже зарегистрирована?"
     )
     keyboard = [
@@ -531,21 +536,17 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected_game = context.user_data.get("selected_game")
     game_info = GAME_INFO.get(selected_game, {})
     
+    if selected_game == "Казань 11.03":
+        period_text = "с 24 февраля по 10 марта"
+    else:  # Краснодар
+        period_text = "с 24 февраля по 13 марта"
+    
     terms_text = (
         "📋 Условия участия по ставке\n\n"
         "1. Минимальная сумма пари - 700₽.\n"
         "2. Тип пари - ординар, коэффициент - от 1.5 до 3.\n"
-    )
-    
-    if selected_game == "Казань 11.03":
-        terms_text += f"3. Пари должно быть заключено в период:\n   — Казань: с 24 февраля по 10 марта\n"
-    elif selected_game == "Краснодар 14.03":
-        terms_text += f"3. Пари должно быть заключено в период:\n   — Краснодар: с 24 февраля по 13 марта\n"
-    else:
-        terms_text += f"3. Пари должно быть заключено в период:\n   — Казань: с 24 февраля по 10 марта\n   — Краснодар: с 24 февраля по 13 марта\n"
-    
-    terms_text += (
-        "\n4. Бесплатное участие предоставляется только игроку, с аккаунта которого было заключено пари.\n"
+        f"3. Пари должно быть заключено в период {period_text}.\n"
+        "4. Бесплатное участие предоставляется игроку, с аккаунта которого было заключено пари.\n"
         "5. Для оформления необходимо указать:\n"
         "   — ID клиента\n"
         "   — Номер пари\n"
@@ -664,14 +665,31 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"Новая регистрация: {registration}")
 
-    venue_short = game_info.get('venue_short', '')
+    venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
+    city_prepositional = game_info.get('city_prepositional', '')
     
     if city_name == "Москва":
-        final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_short}\n\nМы свяжемся с капитаном при необходимости."
+        final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_prepositional}\n\nМы свяжемся с капитаном при необходимости."
         keyboard = [
             [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
         ]
-    else:
+    elif city_name == "Казань":
+        final_message = (
+            f"Команда зарегистрирована ✅\n\n"
+            f"Мы свяжемся с капитаном при необходимости.\n\n"
+            f"Если кто-то из игроков хочет пойти бесплатно — можно оформить участие по ставке прямо здесь 👇"
+        )
+        keyboard = [
+            [
+                InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration"),
+                InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")
+            ],
+            [
+                InlineKeyboardButton("❓ Помощь", callback_data="help"),
+                InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
+            ]
+        ]
+    else:  # Краснодар
         final_message = (
             f"Команда зарегистрирована ✅\n\n"
             f"Мы свяжемся с капитаном при необходимости.\n\n"
@@ -809,13 +827,13 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
 
     save_to_google_sheets(promo_registration)
 
-    venue_short = game_info.get('venue_short', '')
+    venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     city_name = selected_game.split()[0] if selected_game else ""
     
     if city_name == "Казань":
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас 11 марта в {venue_short}.\nДо встречи на квизе!"
+        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас 11 марта в {venue_prepositional}.\nДо встречи на квизе!"
     elif city_name == "Краснодар":
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас 14 марта в баре Namesti.\nДо встречи на квизе!"
+        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас 14 марта в {venue_prepositional}.\nДо встречи на квизе!"
     else:
         final_text = "✅ Участие по ставке подтверждено.\n\nДо встречи на квизе!"
     
