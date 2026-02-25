@@ -235,7 +235,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
             if update.callback_query:
-                await update.callback_query.edit_message_media(
+                await update.callback_query.message.edit_media(
                     media=InputMediaPhoto(media=photo, caption=welcome_text),
                     reply_markup=reply_markup
                 )
@@ -247,7 +247,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
     else:
         if update.callback_query:
-            await update.callback_query.edit_message_text(
+            await update.callback_query.message.edit_text(
                 text=welcome_text,
                 reply_markup=reply_markup
             )
@@ -559,7 +559,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "Готовы ли взять «Легионера» в команду?",
+        "Готовы ли взять в команду «легионера» (человека без команды)?",
         reply_markup=reply_markup
     )
     return REGISTER_LEGIONER
