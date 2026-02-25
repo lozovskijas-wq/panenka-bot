@@ -12,7 +12,7 @@ from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -221,6 +221,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     welcome_text = (
         "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
+        "Если хотите запустить бота сначала, отправьте команду /start\n\n"
         "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
         "Выберите город и дату 👇"
     )
