@@ -256,14 +256,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик выбора города"""
+    """Обработчик всех кнопок"""
     query = update.callback_query
     await query.answer()
     
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
     
-    # Обработка выбора игры
+    # Главное меню - выбор города
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -277,18 +277,21 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return CITY_SELECTED
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
+            await query.message.reply_text("Ошибка при выборе города")
+            return MAIN_MENU
     
-    # Обработка кнопок назад
+    # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         context.user_data.clear()
         await start(update, context)
         return MAIN_MENU
     
+    # Кнопка "Назад к выбору города" (после выбора города)
     elif callback_data == "back_to_city":
         await show_city_menu(update, context)
         return CITY_SELECTED
     
-    # Обработка помощи
+    # Кнопка "Помощь"
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
@@ -302,7 +305,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
-    # Обработка акции
+    # Кнопки акции
     elif callback_data == "promo_yes":
         await query.message.reply_text("Из какой вы команды?")
         return PROMO_TEAM
@@ -357,14 +360,29 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_terms_menu(update, context)
         return CITY_SELECTED
     
+    # Кнопки для легионера
+    elif callback_data in ["legioner_yes", "legioner_no"]:
+        legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
+        context.user_data["legioner"] = legioner_answer
+        logger.info(f"Легионер: {legioner_answer}")
+        
+        await query.message.reply_text(
+            text="Напишите имя и номер телефона капитана 👇"
+        )
+        return REGISTER_CAPTAIN
+    
     return MAIN_MENU
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
     query = update.callback_query
     selected_game = context.user_data.get("selected_game")
-    game_info = GAME_INFO.get(selected_game, {})
     
+    if not selected_game:
+        await query.message.reply_text("Ошибка: город не выбран")
+        return MAIN_MENU
+    
+    game_info = GAME_INFO.get(selected_game, {})
     photo_file = game_info.get('photo')
     
     if selected_game == "Москва 28.02":
@@ -452,11 +470,10 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает условия акции - ОДИНАКОВЫЙ ТЕКСТ ДЛЯ КАЖДОГО ГОРОДА"""
+    """Показывает условия акции"""
     query = update.callback_query
     selected_game = context.user_data.get("selected_game")
     
-    # Одинаковый текст для Казани
     if selected_game == "Казань 11.03":
         terms_text = (
             "📋 Условия участия по ставке\n\n"
@@ -470,7 +487,6 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "6. Команда должна быть зарегистрирована на игру.\n"
             "7. Организатор вправе проверить корректность предоставленных данных."
         )
-    # Одинаковый текст для Краснодара
     else:  # Краснодар
         terms_text = (
             "📋 Условия участия по ставке\n\n"
@@ -552,20 +568,6 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
     return REGISTER_LEGIONER
-
-async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ответа про легионера"""
-    query = update.callback_query
-    await query.answer()
-    
-    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
-    context.user_data["legioner"] = legioner_answer
-    logger.info(f"Легионер: {legioner_answer}")
-    
-    await query.message.reply_text(
-        text="Напишите имя и номер телефона капитана 👇"
-    )
-    return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода данных капитана"""
@@ -862,7 +864,6 @@ def main():
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_LEGIONER: [
-                    CallbackQueryHandler(legioner_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
