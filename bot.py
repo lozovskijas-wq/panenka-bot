@@ -124,7 +124,7 @@ GAME_INFO = {
     },
     "Краснодар 14.03": {
         "full_date": "14 марта (суббота)",
-        "venue_short": "NAMESTI",
+        "venue_short": "Бар NAMESTI",
         "venue_full": "ул. Красноармейская, 55/2",
         "time_open": "17:00",
         "time_start": "17:30",
@@ -134,7 +134,7 @@ GAME_INFO = {
         "promo_deadline": "13 марта",
         "city": "Краснодаре",
         "city_prepositional": "Краснодаре",
-        "venue_prepositional": "баре Namesti",
+        "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
         "has_promo": True
     }
@@ -235,12 +235,10 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
             if update.callback_query:
-                await update.callback_query.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
+                await update.callback_query.edit_message_media(
+                    media=InputMediaPhoto(media=photo, caption=welcome_text),
                     reply_markup=reply_markup
                 )
-                await update.callback_query.message.delete()
             else:
                 await update.message.reply_photo(
                     photo=photo,
@@ -249,11 +247,10 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
     else:
         if update.callback_query:
-            await update.callback_query.message.reply_text(
+            await update.callback_query.edit_message_text(
                 text=welcome_text,
                 reply_markup=reply_markup
             )
-            await update.callback_query.message.delete()
         else:
             await update.message.reply_text(
                 text=welcome_text,
@@ -298,35 +295,31 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❓ Есть вопрос?\n\n"
             "Напишите его сюда @Panenka_Registration — поможем разобраться."
         )
-        await query.message.reply_text(
-            help_text,
+        await query.message.edit_text(
+            text=help_text,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
             ]])
         )
-        await query.message.delete()
         return HELP_MESSAGE
     
     # Обработка акции
     elif callback_data == "promo_yes":
-        await query.message.reply_text("Из какой вы команды?")
-        await query.message.delete()
+        await query.message.edit_text("Из какой вы команды?")
         return PROMO_TEAM
     
     elif callback_data == "promo_no":
-        await query.message.reply_text(
+        await query.message.edit_text(
             "Сначала необходимо зарегистрировать команду. 👇\n\n"
             "После этого вы сможете оформить участие по ставке.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("📄 Заявить команду", callback_data="register_team")
             ]])
         )
-        await query.message.delete()
         return CITY_SELECTED
     
     elif callback_data == "register_team":
-        await query.message.reply_text("Введите название команды 👇")
-        await query.message.delete()
+        await query.message.edit_text("Введите название команды 👇")
         return REGISTER_TEAM
     
     elif callback_data == "start_registration":
@@ -339,8 +332,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Краснодар": f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Краснодаре – 14 марта.\n\nВведите название команды 👇"
         }
         
-        await query.message.reply_text(welcome_texts.get(city_part, "Введите название команды 👇"))
-        await query.message.delete()
+        await query.message.edit_text(welcome_texts.get(city_part, "Введите название команды 👇"))
         return REGISTER_TEAM
     
     elif callback_data == "start_promo_registration":
@@ -359,8 +351,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.message.reply_text(promo_text, reply_markup=reply_markup)
-        await query.message.delete()
+        await query.message.edit_text(promo_text, reply_markup=reply_markup)
         return CITY_SELECTED
     
     elif callback_data == "promo_terms":
@@ -379,11 +370,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 return await show_city_menu(update, context)
             else:
-                await query.message.reply_text("Ошибка: игра не найдена")
+                await query.message.edit_text("Ошибка: игра не найдена")
                 return MAIN_MENU
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
-            await query.message.reply_text("Ошибка при выборе игры")
+            await query.message.edit_text("Ошибка при выборе игры")
             return MAIN_MENU
     
     return MAIN_MENU
@@ -468,14 +459,12 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.message.reply_photo(
-                photo=photo,
-                caption=menu_text,
+            await query.message.edit_media(
+                media=InputMediaPhoto(media=photo, caption=menu_text),
                 reply_markup=reply_markup
             )
-            await query.message.delete()
     else:
-        await query.message.reply_text("Ошибка загрузки фото")
+        await query.message.edit_text("Ошибка загрузки фото")
     
     return CITY_SELECTED
 
@@ -514,8 +503,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(terms_text, reply_markup=reply_markup)
-    await query.message.delete()
+    await query.message.edit_text(terms_text, reply_markup=reply_markup)
     return CITY_SELECTED
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -585,10 +573,9 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["legioner"] = legioner_answer
     logger.info(f"Легионер: {legioner_answer}")
     
-    await query.message.reply_text(
+    await query.message.edit_text(
         text="Напишите имя и номер телефона капитана 👇"
     )
-    await query.message.delete()
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
