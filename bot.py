@@ -275,6 +275,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 await show_city_menu(update, context)
                 return CITY_SELECTED
+            else:
+                await query.message.reply_text("Ошибка: игра не найдена")
+                return MAIN_MENU
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
             await query.message.reply_text("Ошибка при выборе города")
@@ -283,7 +286,31 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         context.user_data.clear()
-        await start(update, context)
+        welcome_text = (
+            "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
+            "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
+            "Выберите город и дату 👇"
+        )
+        
+        games = load_data().get("games", [])
+        keyboard = []
+        for i, game in enumerate(games):
+            keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if os.path.exists('logo.jpg'):
+            with open('logo.jpg', 'rb') as photo:
+                await query.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+        else:
+            await query.message.reply_text(
+                text=welcome_text,
+                reply_markup=reply_markup
+            )
         return MAIN_MENU
     
     # Кнопка "Назад к выбору города" (после выбора города)
@@ -371,7 +398,10 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
-    return MAIN_MENU
+    # Если кнопка не распознана
+    else:
+        await query.message.reply_text("Неизвестная команда")
+        return MAIN_MENU
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
@@ -568,6 +598,20 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
     return REGISTER_LEGIONER
+
+async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ответа про легионера"""
+    query = update.callback_query
+    await query.answer()
+    
+    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
+    context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
+    
+    await query.message.reply_text(
+        text="Напишите имя и номер телефона капитана 👇"
+    )
+    return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода данных капитана"""
@@ -864,6 +908,7 @@ def main():
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_LEGIONER: [
+                    CallbackQueryHandler(legioner_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
