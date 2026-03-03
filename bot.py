@@ -104,7 +104,8 @@ GAME_INFO = {
         "city_prepositional": "Москве",
         "venue_prepositional": "COiN HALL",
         "photo": PHOTO_MOSCOW,
-        "has_promo": False
+        "has_promo": False,
+        "active": False  # Добавлен флаг активности
     },
     "Казань 11.03": {
         "full_date": "11 марта (среда)",
@@ -120,7 +121,8 @@ GAME_INFO = {
         "city_prepositional": "Казани",
         "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
-        "has_promo": True
+        "has_promo": True,
+        "active": True  # Добавлен флаг активности
     },
     "Краснодар 14.03": {
         "full_date": "14 марта (суббота)",
@@ -136,7 +138,8 @@ GAME_INFO = {
         "city_prepositional": "Краснодаре",
         "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
-        "has_promo": True
+        "has_promo": True,
+        "active": True  # Добавлен флаг активности
     }
 }
 
@@ -233,10 +236,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выберите город и дату 👇"
     )
     
+    # Создаем клавиатуру только с активными городами
     games = load_data().get("games", [])
     keyboard = []
+    
+    # Фильтруем только активные игры
+    active_games = [game for game in games if GAME_INFO.get(game, {}).get("active", False)]
+    
     for i, game in enumerate(games):
-        keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
+        # Добавляем кнопку только если игра активна
+        if GAME_INFO.get(game, {}).get("active", False):
+            keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -262,6 +272,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
+    logger.info(f"Текущее состояние: {context.user_data.get('selected_game')}")
     
     # Главное меню - выбор города
     if callback_data.startswith("game_"):
@@ -271,7 +282,14 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if 0 <= game_index < len(games):
                 selected_game = games[game_index]
+                
+                # Проверяем, активна ли игра
+                if not GAME_INFO.get(selected_game, {}).get("active", False):
+                    await query.message.reply_text("Эта игра уже недоступна для регистрации.")
+                    return MAIN_MENU
+                
                 context.user_data["selected_game"] = selected_game
+                logger.info(f"Выбран город: {selected_game}")
                 
                 await show_city_menu(update, context)
                 return CITY_SELECTED
@@ -286,34 +304,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         context.user_data.clear()
-        welcome_text = (
-            "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
-            "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
-            "Выберите город и дату 👇"
-        )
-        
-        games = load_data().get("games", [])
-        keyboard = []
-        for i, game in enumerate(games):
-            keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await query.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            await query.message.reply_text(
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
-        return MAIN_MENU
+        return await start(update, context)
     
-    # Кнопка "Назад к выбору города" (после выбора города)
+    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         await show_city_menu(update, context)
         return CITY_SELECTED
@@ -347,13 +340,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
-    elif callback_data == "register_team":
-        await query.message.reply_text("Введите название команды 👇")
-        return REGISTER_TEAM
-    
+    # Кнопка "Заявить команду" из меню после выбора города
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         city_part = city_name.split()[0] if city_name else ""
+        logger.info(f"Начало регистрации для города: {city_part}")
         
         welcome_texts = {
             "Москва": f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 28 февраля.\n\nВведите название команды 👇",
@@ -364,6 +355,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(welcome_texts.get(city_part, "Введите название команды 👇"))
         return REGISTER_TEAM
     
+    # Кнопка "Прийти по ставке"
     elif callback_data == "start_promo_registration":
         promo_text = (
             "🎟️ Участие по ставке предоставляется игроку, с аккаунта которого было заключено пари\n\n"
@@ -383,6 +375,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(promo_text, reply_markup=reply_markup)
         return CITY_SELECTED
     
+    # Кнопка "Условия акции"
     elif callback_data == "promo_terms":
         await show_terms_menu(update, context)
         return CITY_SELECTED
@@ -400,6 +393,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Если кнопка не распознана
     else:
+        logger.warning(f"Неизвестная кнопка: {callback_data}")
         await query.message.reply_text("Неизвестная команда")
         return MAIN_MENU
 
@@ -533,7 +527,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [
-            InlineKeyboardButton("📄 Заявить команду", callback_data="register_team"),
+            InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration"),
             InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")
         ],
         [
