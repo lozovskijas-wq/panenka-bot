@@ -24,6 +24,9 @@ from telegram.ext import (
 )
 from flask import Flask
 
+# Константа для таймаута сессии (в секундах)
+SESSION_TIMEOUT = 300  # 5 минут
+
 # Обработка сигналов для корректного завершения
 def signal_handler(sig, frame):
     print('Остановка бота...')
@@ -105,7 +108,7 @@ GAME_INFO = {
         "venue_prepositional": "COiN HALL",
         "photo": PHOTO_MOSCOW,
         "has_promo": False,
-        "active": False  # Добавлен флаг активности
+        "active": False
     },
     "Казань 11.03": {
         "full_date": "11 марта (среда)",
@@ -122,7 +125,7 @@ GAME_INFO = {
         "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
         "has_promo": True,
-        "active": True  # Добавлен флаг активности
+        "active": True
     },
     "Краснодар 14.03": {
         "full_date": "14 марта (суббота)",
@@ -139,7 +142,7 @@ GAME_INFO = {
         "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
         "has_promo": True,
-        "active": True  # Добавлен флаг активности
+        "active": True
     }
 }
 
@@ -217,6 +220,20 @@ def save_to_google_sheets(registration: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
+async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Проверяет, не истек ли таймаут сессии (для iOS)"""
+    last_action = context.user_data.get("last_action", 0)
+    current_time = datetime.now().timestamp()
+    
+    if current_time - last_action > SESSION_TIMEOUT and last_action != 0:
+        if update.message:
+            await update.message.reply_text(
+                "🔄 Сессия обновилась из-за длительного бездействия. Пожалуйста, нажмите /start чтобы начать заново."
+            )
+        context.user_data.clear()
+        return True
+    return False
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user_id = update.effective_user.id
@@ -229,6 +246,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     context.user_data.clear()
+    context.user_data["last_action"] = datetime.now().timestamp()
     
     welcome_text = (
         "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
@@ -236,15 +254,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выберите город и дату 👇"
     )
     
-    # Создаем клавиатуру только с активными городами
     games = load_data().get("games", [])
     keyboard = []
     
-    # Фильтруем только активные игры
-    active_games = [game for game in games if GAME_INFO.get(game, {}).get("active", False)]
-    
     for i, game in enumerate(games):
-        # Добавляем кнопку только если игра активна
         if GAME_INFO.get(game, {}).get("active", False):
             keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
     
@@ -266,13 +279,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик всех кнопок"""
+    """Обработчик всех кнопок с защитой от сбоя состояния на iOS"""
     query = update.callback_query
+    
+    # Проверяем, не потеряно ли состояние (особенно актуально для iOS)
+    if not context.user_data:
+        await query.answer()
+        await query.message.reply_text(
+            "🔄 Сессия обновилась. Пожалуйста, нажмите /start чтобы начать заново.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Начать заново", callback_data="start_over")
+            ]])
+        )
+        return MAIN_MENU
+    
     await query.answer()
     
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
-    logger.info(f"Текущее состояние: {context.user_data.get('selected_game')}")
+    
+    # Специальный callback для перезапуска после сбоя
+    if callback_data == "start_over":
+        return await start(update, context)
+    
+    # Сохраняем время последнего действия
+    context.user_data["last_action"] = datetime.now().timestamp()
     
     # Главное меню - выбор города
     if callback_data.startswith("game_"):
@@ -283,7 +314,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 0 <= game_index < len(games):
                 selected_game = games[game_index]
                 
-                # Проверяем, активна ли игра
                 if not GAME_INFO.get(selected_game, {}).get("active", False):
                     await query.message.reply_text("Эта игра уже недоступна для регистрации.")
                     return MAIN_MENU
@@ -308,6 +338,8 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
+        if not context.user_data.get("selected_game"):
+            return await start(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
@@ -315,15 +347,31 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
-            "Напишите его сюда @Panenka_Registration — поможем разобраться."
+            "Напишите его сюда @Panenka_Registration — поможем разобраться.\n\n"
+            "📱 *Проблема с кнопками на iPhone?*\n"
+            "• Отправьте любое сообщение (например, точку)\n"
+            "• Или нажмите кнопку '🔄 Обновить' ниже"
         )
+        keyboard = [
+            [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")],
+            [InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]
+        ]
         await query.message.reply_text(
             help_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        return HELP_MESSAGE
+    
+    # Кнопка обновления (для iOS)
+    elif callback_data == "refresh":
+        await query.message.reply_text(
+            "🔄 Состояние обновлено. Попробуйте снова.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
             ]])
         )
-        return HELP_MESSAGE
+        return CITY_SELECTED
     
     # Кнопки акции
     elif callback_data == "promo_yes":
@@ -394,7 +442,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Если кнопка не распознана
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
-        await query.message.reply_text("Неизвестная команда")
+        await query.message.reply_text(
+            "❓ Неизвестная команда. Нажмите /start чтобы начать заново.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔄 Обновить", callback_data="refresh")
+            ]])
+        )
         return MAIN_MENU
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -541,6 +594,9 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода названия команды"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return REGISTER_TEAM
@@ -551,6 +607,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return REGISTER_TEAM
     
     context.user_data["team_name"] = team_name
+    context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Название команды: {team_name}")
     
     await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
@@ -558,6 +615,9 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода количества игроков"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return REGISTER_PLAYERS
@@ -577,6 +637,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         return REGISTER_PLAYERS
     
     context.user_data["player_count"] = player_count
+    context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Количество игроков: {player_count}")
     
     keyboard = [
@@ -600,6 +661,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
     context.user_data["legioner"] = legioner_answer
+    context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Легионер: {legioner_answer}")
     
     await query.message.reply_text(
@@ -609,6 +671,9 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода данных капитана"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -692,6 +757,9 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода названия команды для акции"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return PROMO_TEAM
@@ -702,6 +770,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return PROMO_TEAM
     
     context.user_data["promo_team"] = team_name
+    context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Команда для акции: {team_name}")
     
     selected_game = context.user_data.get("selected_game")
@@ -722,6 +791,9 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода ID клиента"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите ID клиента.")
         return PROMO_CLIENT_ID
@@ -732,6 +804,7 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return PROMO_CLIENT_ID
     
     context.user_data["client_id"] = client_id
+    context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"ID клиента: {client_id}")
     
     await update.message.reply_text(
@@ -742,6 +815,9 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода номера пари"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите номер пари.")
         return PROMO_BET_NUMBER
@@ -752,6 +828,7 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         return PROMO_BET_NUMBER
     
     context.user_data["bet_number"] = bet_number
+    context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Номер пари: {bet_number}")
     
     await update.message.reply_text("Напишите имя и номер телефона 👇")
@@ -759,6 +836,9 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода телефона"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите имя и телефон.")
         return PROMO_PHONE
@@ -838,6 +918,9 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода вопроса"""
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
@@ -876,6 +959,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Действие отменено")
     await start(update, context)
     return MAIN_MENU
+
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Принудительный сброс состояния бота"""
+    context.user_data.clear()
+    await update.message.reply_text("🔄 Состояние бота сброшено. Нажмите /start")
+    return await start(update, context)
 
 def main():
     Thread(target=run_web, daemon=True).start()
@@ -937,6 +1026,7 @@ def main():
         )
 
         application.add_handler(conv_handler)
+        application.add_handler(CommandHandler("reset", reset))
 
         print("✅ Бот запущен!")
         print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
