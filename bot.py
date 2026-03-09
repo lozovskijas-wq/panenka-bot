@@ -234,8 +234,8 @@ async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TY
         return True
     return False
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает главное меню (работает и с message, и с callback_query)"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -263,20 +263,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Определяем откуда пришел вызов
+    if update.callback_query:
+        message = update.callback_query.message
+    else:
+        message = update.message
+    
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            await update.message.reply_photo(
+            await message.reply_photo(
                 photo=photo,
                 caption=welcome_text,
                 reply_markup=reply_markup
             )
     else:
-        await update.message.reply_text(
+        await message.reply_text(
             text=welcome_text,
             reply_markup=reply_markup
         )
     
     return MAIN_MENU
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
+    return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик всех кнопок с защитой от сбоя состояния на iOS"""
@@ -300,7 +310,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Специальный callback для перезапуска после сбоя
     if callback_data == "start_over":
-        return await start(update, context)
+        return await show_main_menu(update, context)
     
     # Сохраняем время последнего действия
     context.user_data["last_action"] = datetime.now().timestamp()
@@ -331,15 +341,14 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
-    # Кнопка "Назад в главное меню"
+    # Кнопка "Назад в главное меню" - ИСПРАВЛЕНО!
     elif callback_data == "back_to_main":
-        context.user_data.clear()
-        return await start(update, context)
+        return await show_main_menu(update, context)
     
-    # Кнопка "Назад к выбору города"
+    # Кнопка "Назад к выбору города" - ИСПРАВЛЕНО!
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
-            return await start(update, context)
+            return await show_main_menu(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
@@ -957,14 +966,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
-    await start(update, context)
-    return MAIN_MENU
+    return await show_main_menu(update, context)
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Принудительный сброс состояния бота"""
     context.user_data.clear()
     await update.message.reply_text("🔄 Состояние бота сброшено. Нажмите /start")
-    return await start(update, context)
+    return await show_main_menu(update, context)
 
 def main():
     Thread(target=run_web, daemon=True).start()
