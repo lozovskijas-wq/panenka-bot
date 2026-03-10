@@ -266,21 +266,31 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Определяем откуда пришел вызов
     if update.callback_query:
         message = update.callback_query.message
-    else:
-        message = update.message
-    
-    if os.path.exists('logo.jpg'):
-        with open('logo.jpg', 'rb') as photo:
-            await message.reply_photo(
-                photo=photo,
-                caption=welcome_text,
+        if os.path.exists('logo.jpg'):
+            with open('logo.jpg', 'rb') as photo:
+                await message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+        else:
+            await message.reply_text(
+                text=welcome_text,
                 reply_markup=reply_markup
             )
     else:
-        await message.reply_text(
-            text=welcome_text,
-            reply_markup=reply_markup
-        )
+        if os.path.exists('logo.jpg'):
+            with open('logo.jpg', 'rb') as photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+        else:
+            await update.message.reply_text(
+                text=welcome_text,
+                reply_markup=reply_markup
+            )
     
     return MAIN_MENU
 
@@ -289,31 +299,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик всех кнопок с защитой от сбоя состояния на iOS"""
+    """Обработчик всех кнопок"""
     query = update.callback_query
-    
-    # Проверяем, не потеряно ли состояние (особенно актуально для iOS)
-    if not context.user_data:
-        await query.answer()
-        await query.message.reply_text(
-            "🔄 Сессия обновилась. Пожалуйста, нажмите /start чтобы начать заново.",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 Начать заново", callback_data="start_over")
-            ]])
-        )
-        return MAIN_MENU
-    
     await query.answer()
     
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
     
+    # Сохраняем время последнего действия
+    context.user_data["last_action"] = datetime.now().timestamp()
+    
     # Специальный callback для перезапуска после сбоя
     if callback_data == "start_over":
         return await show_main_menu(update, context)
-    
-    # Сохраняем время последнего действия
-    context.user_data["last_action"] = datetime.now().timestamp()
     
     # Главное меню - выбор города
     if callback_data.startswith("game_"):
@@ -341,11 +339,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
-    # Кнопка "Назад в главное меню" - ИСПРАВЛЕНО!
+    # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         return await show_main_menu(update, context)
     
-    # Кнопка "Назад к выбору города" - ИСПРАВЛЕНО!
+    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await show_main_menu(update, context)
@@ -448,16 +446,16 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
+    # Кнопка "Заявить команду" (альтернативный callback)
+    elif callback_data == "register_team":
+        await query.message.reply_text("Введите название команды 👇")
+        return REGISTER_TEAM
+    
     # Если кнопка не распознана
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
-        await query.message.reply_text(
-            "❓ Неизвестная команда. Нажмите /start чтобы начать заново.",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔄 Обновить", callback_data="refresh")
-            ]])
-        )
-        return MAIN_MENU
+        # Пытаемся восстановить сессию - показываем главное меню
+        return await show_main_menu(update, context)
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
@@ -1030,6 +1028,7 @@ def main():
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
+                CallbackQueryHandler(game_selected),
             ],
         )
 
