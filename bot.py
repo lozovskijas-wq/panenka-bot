@@ -24,7 +24,6 @@ from telegram.ext import (
 )
 from flask import Flask
 
-# Константа для таймаута сессии (в секундах)
 SESSION_TIMEOUT = 300
 
 def signal_handler(sig, frame):
