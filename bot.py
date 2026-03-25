@@ -235,7 +235,6 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, mes
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Определяем, какое сообщение использовать
     if message_obj:
         target = message_obj
     elif update.callback_query:
@@ -300,7 +299,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data == "back_to_main":
         return await show_main_menu(update, context, query.message)
     
-    # Кнопка "Назад к выбору города"
+    # Кнопка "Назад к выбору города" - для помощи и других мест
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await show_main_menu(update, context, query.message)
@@ -594,6 +593,7 @@ def main():
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),  # Добавлен для кнопки "Назад"
                 ],
             },
             fallbacks=[
