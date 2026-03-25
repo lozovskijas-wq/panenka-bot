@@ -206,7 +206,8 @@ def save_to_google_sheets(registration: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_obj=None):
+    """Показывает главное меню (работает и с message, и с callback_query)"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -234,20 +235,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Определяем, какое сообщение использовать
+    if message_obj:
+        target = message_obj
+    elif update.callback_query:
+        target = update.callback_query.message
+    else:
+        target = update.message
+    
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            await update.message.reply_photo(
+            await target.reply_photo(
                 photo=photo,
                 caption=welcome_text,
                 reply_markup=reply_markup
             )
     else:
-        await update.message.reply_text(
+        await target.reply_text(
             text=welcome_text,
             reply_markup=reply_markup
         )
     
     return MAIN_MENU
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -286,12 +298,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
-        return await start(update, context)
+        return await show_main_menu(update, context, query.message)
     
     # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
-            return await start(update, context)
+            return await show_main_menu(update, context, query.message)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
@@ -550,7 +562,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
-    return await start(update, context)
+    return await show_main_menu(update, context)
 
 def main():
     Thread(target=run_web, daemon=True).start()
