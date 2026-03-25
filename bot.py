@@ -80,12 +80,8 @@ logger = logging.getLogger(__name__)
     REGISTER_PLAYERS,
     REGISTER_LEGIONER,
     REGISTER_CAPTAIN,
-    PROMO_TEAM,
-    PROMO_CLIENT_ID,
-    PROMO_BET_NUMBER,
-    PROMO_PHONE,
     HELP_MESSAGE,
-) = range(11)
+) = range(7)
 
 PHOTO_MOSCOW = "photo1.jpg"
 PHOTO_KAZAN = "photo2.jpg"
@@ -104,7 +100,6 @@ GAME_INFO = {
         "city_prepositional": "Москве",
         "venue_prepositional": "баре «Золотая Вобла»",
         "photo": PHOTO_MOSCOW,
-        "has_promo": False,
         "active": True
     },
     "Казань 11.03": {
@@ -115,13 +110,10 @@ GAME_INFO = {
         "time_start": "19:30",
         "price_jersey": "700₽",
         "price_regular": "900₽",
-        "promo_period": "с 24 февраля по 10 марта",
-        "promo_deadline": "10 марта",
         "city": "Казани",
         "city_prepositional": "Казани",
         "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
-        "has_promo": True,
         "active": False
     },
     "Краснодар 14.03": {
@@ -132,13 +124,10 @@ GAME_INFO = {
         "time_start": "17:30",
         "price_jersey": "700₽",
         "price_regular": "900₽",
-        "promo_period": "с 24 февраля по 13 марта",
-        "promo_deadline": "13 марта",
         "city": "Краснодаре",
         "city_prepositional": "Краснодаре",
         "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
-        "has_promo": True,
         "active": False
     }
 }
@@ -216,19 +205,6 @@ def save_to_google_sheets(registration: Dict[str, Any]):
             logger.warning(f"Файл credentials.json не найден")
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
-
-async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    last_action = context.user_data.get("last_action", 0)
-    current_time = datetime.now().timestamp()
-    
-    if current_time - last_action > SESSION_TIMEOUT and last_action != 0:
-        if update.message:
-            await update.message.reply_text(
-                "🔄 Сессия обновилась из-за длительного бездействия. Пожалуйста, нажмите /start чтобы начать заново."
-            )
-        context.user_data.clear()
-        return True
-    return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -336,18 +312,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка "Заявить команду"
     elif callback_data == "start_registration":
-        city_name = context.user_data.get("selected_game", "")
-        city_part = city_name.split()[0] if city_name else ""
-        logger.info(f"Начало регистрации для города: {city_part}")
-        
         await query.message.reply_text(
             f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
         )
-        return REGISTER_TEAM
-    
-    # Кнопка "Заявить команду" (альтернативный callback)
-    elif callback_data == "register_team":
-        await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
     
     # Кнопки для легионера
@@ -413,9 +380,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if await check_session_timeout(update, context):
-        return MAIN_MENU
-    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return REGISTER_TEAM
@@ -433,9 +397,6 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if await check_session_timeout(update, context):
-        return MAIN_MENU
-    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return REGISTER_PLAYERS
@@ -487,9 +448,6 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if await check_session_timeout(update, context):
-        return MAIN_MENU
-    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -557,9 +515,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if await check_session_timeout(update, context):
-        return MAIN_MENU
-    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
@@ -628,10 +583,6 @@ def main():
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                 ],
-                PROMO_TEAM: [],
-                PROMO_CLIENT_ID: [],
-                PROMO_BET_NUMBER: [],
-                PROMO_PHONE: [],
             },
             fallbacks=[
                 CommandHandler("cancel", cancel),
