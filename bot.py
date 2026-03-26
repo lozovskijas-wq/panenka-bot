@@ -503,6 +503,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена текущего действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
+    # Возвращаемся в главное меню
     return await start(update, context)
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -525,17 +526,32 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     stats += f"\n📈 Всего команд: {total}"
     
+    if total == 0:
+        stats += "\n\nПока нет регистраций"
+    
     await update.message.reply_text(stats)
+
+async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик неизвестных команд"""
+    await update.message.reply_text(
+        "❓ Неизвестная команда.\n\n"
+        "Используйте /start для начала работы."
+    )
 
 def main():
     # Запускаем веб-сервер
     Thread(target=run_web, daemon=True).start()
-    logger.info("🌐 Веб-сервер запущен")
+    logger.info("🌐 Веб-сервер запущен на порту 10000")
     
     try:
         application = Application.builder().token(BOT_TOKEN).build()
         
-        # Создаем ConversationHandler
+        # Добавляем обработчики команд вне ConversationHandler
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("cancel", cancel))
+        application.add_handler(CommandHandler("stats", stats_command))
+        
+        # Создаем ConversationHandler для регистрации
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
@@ -562,20 +578,28 @@ def main():
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
             ],
+            allow_reentry=True,  # Разрешаем повторный вход
         )
         
         application.add_handler(conv_handler)
-        application.add_handler(CommandHandler("stats", stats_command))
+        
+        # Обработчик для сообщений помощи (когда пользователь ввел вопрос)
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_handler))
         
-        print("✅ Бот запущен и готов к работе!")
+        # Обработчик неизвестных команд
+        application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+        
+        print("=" * 50)
+        print("✅ Бот успешно запущен!")
         print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
         print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
+        print(f"🎮 Активные игры: Москва 11.04")
+        print("=" * 50)
         
         application.run_polling(drop_pending_updates=True)
         
     except Exception as e:
-        logger.error(f"Ошибка: {e}")
+        logger.error(f"Критическая ошибка: {e}")
         time.sleep(5)
         os.execl(sys.executable, sys.executable, *sys.argv)
 
