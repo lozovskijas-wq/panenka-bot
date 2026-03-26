@@ -23,13 +23,7 @@ from telegram.ext import (
     ContextTypes,
 )
 from flask import Flask
-async def shutdown(signal, loop):
-    """Gracefully shutdown the bot"""
-    logger.info(f"Received exit signal {signal.name}...")
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    await asyncio.gather(*tasks, return_exceptions=True)
-    loop.stop()
+
 # Константа для таймаута сессии (в секундах)
 SESSION_TIMEOUT = 300
 
@@ -312,6 +306,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
     return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -700,45 +695,56 @@ def main():
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 CITY_SELECTED: [
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлено!
                 ],
             },
             fallbacks=[
