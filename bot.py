@@ -18,7 +18,8 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    ConversationHandler,    filters,
+    ConversationHandler,
+    filters,
     ContextTypes,
 )
 from flask import Flask
@@ -102,7 +103,6 @@ GAME_INFO = {
         "city_prepositional": "Москве",
         "venue_prepositional": "Бар «Золотая вобла»",
         "photo": PHOTO_MOSCOW,
-        "has_promo": False,
         "active": True
     },
     "Казань 11.03": {
@@ -117,7 +117,6 @@ GAME_INFO = {
         "city_prepositional": "Казани",
         "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
-        "has_promo": False,
         "active": False
     },
     "Краснодар 14.03": {
@@ -132,7 +131,6 @@ GAME_INFO = {
         "city_prepositional": "Краснодаре",
         "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
-        "has_promo": False,
         "active": False
     }
 }
@@ -185,6 +183,30 @@ def save_data(data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
 
+def save_to_google_sheets(registration: Dict[str, Any]):
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_file = "credentials.json"
+        if os.path.exists(creds_file):
+            creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+            client = gspread.authorize(creds)
+            sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+            now = datetime.now()
+            row = [
+                now.strftime("%Y-%m-%d"),
+                now.strftime("%H:%M"),
+                registration.get('selected_game', ''),
+                registration.get('team_name', ''),
+                registration.get('captain_info', ''),
+                str(registration.get('user_id', ''))
+            ]
+            sheet.append_row(row)
+            logger.info(f"✅ Данные сохранены в Google Sheets")
+        else:
+            logger.warning(f"Файл credentials.json не найден")
+    except Exception as e:
+        logger.error(f"Ошибка сохранения в Google Sheets: {e}")
+
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отправляет главное меню"""
     user_id = update.effective_user.id
@@ -230,6 +252,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
+    context.user_data.clear()
     return await send_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -242,6 +265,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Обработка кнопки "Назад в главное меню"
     if callback_data == "back_to_main":
+        context.user_data.clear()
         return await send_main_menu(update, context)
     
     # Обработка кнопки "Назад к выбору города"
@@ -420,6 +444,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     user = update.effective_user
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
+    player_count = context.user_data.get("player_count", "")
+    legioner = context.user_data.get("legioner", "Не указано")
     game_info = GAME_INFO.get(selected_game, {})
 
     registration = {
@@ -428,8 +454,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         "full_name": user.full_name,
         "selected_game": selected_game,
         "team_name": team_name,
-        "player_count": context.user_data.get("player_count"),
-        "legioner": context.user_data.get("legioner", "Не указано"),
+        "player_count": player_count,
+        "legioner": legioner,
         "captain_info": captain_info,
         "date": str(update.message.date)
     }
@@ -440,6 +466,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     data["registrations"].append(registration)
     save_data(data)
     logger.info(f"Новая регистрация: {registration}")
+
+    save_to_google_sheets(registration)
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
@@ -456,8 +484,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         f"🔔 Новая регистрация!\n"
         f"Игра: {selected_game}\n"
         f"Команда: {team_name}\n"
-        f"Игроков: {context.user_data.get('player_count')}\n"
-        f"Легионер: {context.user_data.get('legioner', 'Не указано')}\n"
+        f"Игроков: {player_count}\n"
+        f"Легионер: {legioner}\n"
         f"Капитан: {captain_info}\n"
         f"От: {user.full_name} (@{user.username})"
     )
@@ -531,18 +559,22 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
+                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
+                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
+                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
                 ],
             },
             fallbacks=[
