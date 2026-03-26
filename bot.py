@@ -4,7 +4,6 @@ import os
 import base64
 import gspread
 import asyncio
-import signal
 import sys
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -21,7 +20,11 @@ if not BOT_TOKEN:
     print("ERROR: BOT_TOKEN is not set")
     sys.exit(1)
 
-logging.basicConfig(level=logging.INFO)
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Flask приложение для health check
@@ -71,10 +74,11 @@ async def save_to_google_sheets(reg):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start"""
     context.user_data.clear()
+    logger.info(f"Пользователь {update.effective_user.id} запустил /start")
+    
     text = "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\nВыберите город:"
     keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
     
-    # Проверяем наличие logo.jpg
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
             await update.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -86,7 +90,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     action = query.data
-    logger.info(f"Кнопка: {action}")
+    logger.info(f"Нажата кнопка: {action}")
     
     if action == "city_moscow":
         text = """📍 Москва – 11 апреля (суббота)
@@ -110,7 +114,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❓ Помощь", callback_data="help"), InlineKeyboardButton("🔙 Назад", callback_data="back")]
         ]
         
-        # Проверяем наличие photo1.jpg
         if os.path.exists('photo1.jpg'):
             with open('photo1.jpg', 'rb') as photo:
                 await query.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -129,6 +132,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif action == "help":
         context.user_data['help_mode'] = True
+        logger.info("Включен режим помощи")
         keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
         await query.message.reply_text("❓ Напишите ваш вопрос одним сообщением:", reply_markup=InlineKeyboardMarkup(keyboard))
     
@@ -159,18 +163,23 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "register":
         context.user_data['reg'] = {}
         context.user_data['step'] = 'team'
+        logger.info("Начата регистрация, шаг: team")
         await query.message.reply_text("Введите название команды 👇")
     
     elif action == "legioner_yes":
+        if 'reg' not in context.user_data:
+            context.user_data['reg'] = {}
         context.user_data['reg']['legioner'] = "Да"
         context.user_data['step'] = 'captain'
-        # Убрал пример, оставил только текст
+        logger.info(f"Выбран легионер: Да, переходим к шагу: captain")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
     
     elif action == "legioner_no":
+        if 'reg' not in context.user_data:
+            context.user_data['reg'] = {}
         context.user_data['reg']['legioner'] = "Нет"
         context.user_data['step'] = 'captain'
-        # Убрал пример, оставил только текст
+        logger.info(f"Выбран легионер: Нет, переходим к шагу: captain")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,8 +187,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text.strip()
     
+    logger.info(f"Получено сообщение от {user.id}: '{text}'")
+    logger.info(f"Текущие данные пользователя: {context.user_data}")
+    
     # Режим помощи
     if context.user_data.get('help_mode'):
+        logger.info("Режим помощи: отправка вопроса админу")
         msg = f"❓ Вопрос от {user.full_name} (@{user.username})\n\n{text}"
         await context.bot.send_message(chat_id=HELP_ADMIN_ID, text=msg)
         await update.message.reply_text("✅ Вопрос отправлен! Мы ответим в ближайшее время.")
@@ -191,6 +204,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reg = context.user_data['reg']
         step = context.user_data.get('step')
         
+        logger.info(f"Режим регистрации, текущий шаг: {step}")
+        
         # Шаг 1: название команды
         if step == 'team':
             if len(text) > 50:
@@ -201,6 +216,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             reg['team'] = text
             context.user_data['step'] = 'players'
+            logger.info(f"Шаг team завершен, переходим к шагу players")
             await update.message.reply_text("Сколько игроков? (от 3 до 10)")
         
         # Шаг 2: количество игроков
@@ -214,14 +230,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             reg['players'] = text
             context.user_data['step'] = 'legioner'
+            logger.info(f"Шаг players завершен, переходим к шагу legioner")
             keyboard = [
                 [InlineKeyboardButton("✅ Да", callback_data="legioner_yes")],
                 [InlineKeyboardButton("❌ Нет", callback_data="legioner_no")]
             ]
             await update.message.reply_text("Готовы взять легионера (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
         
-        # Шаг 3: данные капитана (принимаем любой текст)
+        # Шаг 3: данные капитана
         elif step == 'captain':
+            logger.info(f"Шаг captain: получены данные капитана: {text}")
+            
             if len(text) > 200:
                 await update.message.reply_text("Данные слишком длинные. Введите короче:")
                 return
@@ -229,16 +248,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("Пожалуйста, введите имя и телефон капитана:")
                 return
             
-            # Сохраняем данные капитана как есть, без разделения
+            # Сохраняем данные
             reg['captain'] = text
             reg['user_id'] = user.id
             reg['user_name'] = user.full_name
             reg['date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Сохраняем регистрацию
+            logger.info(f"Сохранение регистрации: {reg}")
+            
+            # Сохраняем в JSON
             data = load_data()
             data['registrations'].append(reg)
             save_data(data)
+            logger.info("✅ Сохранено в JSON")
             
             # Сохраняем в Google Sheets
             await save_to_google_sheets(reg)
@@ -248,8 +270,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for admin_id in ADMIN_IDS:
                 try:
                     await context.bot.send_message(chat_id=admin_id, text=admin_msg)
-                except:
-                    pass
+                    logger.info(f"Уведомление отправлено админу {admin_id}")
+                except Exception as e:
+                    logger.error(f"Ошибка отправки админу {admin_id}: {e}")
             
             # Ответ пользователю
             result = f"✅ Команда зарегистрирована!\n\n🏆 {reg['team']}\n👥 {reg['players']} игроков\n🌟 Легионер: {reg['legioner']}\n👨‍💼 Капитан: {reg['captain']}\n\nЖдем вас!"
@@ -258,6 +281,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Очищаем данные
             context.user_data.clear()
+            logger.info("Регистрация завершена, данные очищены")
+        
+        else:
+            logger.warning(f"Неизвестный шаг: {step}")
+            # Если шаг неизвестен, сбрасываем
+            context.user_data.clear()
+            await update.message.reply_text("Что-то пошло не так. Начните заново с /start")
+    
+    else:
+        logger.info("Нет активного режима, показываем главное меню")
+        # Если ничего не ожидаем, показываем главное меню
+        text = "Выберите город:"
+        keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -285,9 +322,10 @@ async def main():
     app.add_handler(CallbackQueryHandler(button_click))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
+    print("=" * 50)
     print("✅ БОТ ЗАПУЩЕН!")
     print(f"📁 Текущая директория: {os.getcwd()}")
-    print(f"🖼️ Файлы в директории: {os.listdir('.')}")
+    print("=" * 50)
     
     # Запускаем бота с очисткой вебхука
     await app.bot.delete_webhook(drop_pending_updates=True)
