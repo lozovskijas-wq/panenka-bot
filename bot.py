@@ -31,7 +31,7 @@ async def shutdown(signal, loop):
     await asyncio.gather(*tasks, return_exceptions=True)
     loop.stop()
 # Константа для таймаута сессии (в секундах)
-SESSION_TIMEOUT = 300  # 5 минут
+SESSION_TIMEOUT = 300
 
 # Обработка сигналов для корректного завершения
 def signal_handler(sig, frame):
@@ -227,7 +227,6 @@ def save_to_google_sheets(registration: Dict[str, Any]):
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
 async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Проверяет, не истек ли таймаут сессии (для iOS)"""
     last_action = context.user_data.get("last_action", 0)
     current_time = datetime.now().timestamp()
     
@@ -263,14 +262,12 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     games = load_data().get("games", [])
     keyboard = []
     
-    # Показываем только активные игры (только Москва 11.04)
     for i, game in enumerate(games):
         if GAME_INFO.get(game, {}).get("active", False):
             keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Определяем откуда пришел вызов и отправляем сообщение
     try:
         if update.callback_query:
             message = update.callback_query.message
@@ -301,7 +298,6 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
     except Exception as e:
         logger.error(f"Ошибка отправки главного меню: {e}")
-        # Если ошибка, пробуем отправить просто текст
         if update.callback_query:
             await update.callback_query.message.reply_text(
                 text=welcome_text,
@@ -316,7 +312,6 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
     return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -327,14 +322,13 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
     
-    # Сохраняем время последнего действия
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # Специальный callback для перезапуска после сбоя
+    # Специальный callback для перезапуска
     if callback_data == "start_over":
         return await show_main_menu(update, context)
     
-    # Главное меню - выбор города
+    # Выбор города
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -391,7 +385,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
-    # Кнопка обновления (для iOS)
+    # Кнопка обновления
     elif callback_data == "refresh":
         await query.message.reply_text(
             "🔄 Состояние обновлено. Попробуйте снова.",
@@ -401,7 +395,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
-    # Кнопка "Заявить команду" из меню после выбора города
+    # Кнопка "Заявить команду"
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         city_part = city_name.split()[0] if city_name else ""
@@ -425,7 +419,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
-    # Кнопка "Заявить команду" (альтернативный callback)
+    # Кнопка "Заявить команду" (альтернативный)
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
@@ -447,7 +441,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game_info = GAME_INFO.get(selected_game, {})
     photo_file = game_info.get('photo')
     
-    # Москва 11.04 (без акции)
     menu_text = (
         f"📍 Москва – 11 апреля (суббота)\n\n"
         f"🏟️ {game_info['venue_short']}\n"
@@ -485,13 +478,11 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает условия акции (не используется для Москвы)"""
     query = update.callback_query
     await query.message.reply_text("Акция не проводится для этой игры.")
     return CITY_SELECTED
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода названия команды"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -512,7 +503,6 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода количества игроков"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -553,7 +543,6 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ответа про легионера"""
     query = update.callback_query
     await query.answer()
     
@@ -568,7 +557,6 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода данных капитана"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -639,27 +627,22 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода названия команды для акции (не используется)"""
     await update.message.reply_text("Акция не проводится для этой игры.")
     return MAIN_MENU
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода ID клиента (не используется)"""
     await update.message.reply_text("Акция не проводится для этой игры.")
     return MAIN_MENU
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода номера пари (не используется)"""
     await update.message.reply_text("Акция не проводится для этой игры.")
     return MAIN_MENU
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода телефона (не используется)"""
     await update.message.reply_text("Акция не проводится для этой игры.")
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода вопроса"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -696,13 +679,11 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
     return await show_main_menu(update, context)
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Принудительный сброс состояния бота"""
     context.user_data.clear()
     await update.message.reply_text("🔄 Состояние бота сброшено. Нажмите /start")
     return await show_main_menu(update, context)
