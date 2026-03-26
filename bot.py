@@ -375,7 +375,7 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🏟️ {game_info['venue_short']}\n"
         f"📫 {game_info['venue_full']}\n\n"
         f"🕖 Двери открыты с {game_info['time_open']}\n"
-        f"⚽ Старт игры – {game_info['time_start']}\n\n"
+        f"⚽️ Старт игры – {game_info['time_start']}\n\n"
         f"💰 Стоимость участия:\n"
         f"{game_info['price_jersey']} – в джерси любого клуба или сборной,\n"
         f"{game_info['price_regular']} – в обычной одежде\n\n"
