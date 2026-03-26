@@ -149,7 +149,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка города Москва
     if data == "city_moscow":
-        context.user_data["current_menu"] = "city"
         game_text = GAME_INFO["Москва 11.04"]["text"]
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register_start")],
@@ -168,15 +167,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Начать регистрацию
     elif data == "register_start":
-        context.user_data["registration"] = {}
-        context.user_data["step"] = "team_name"
+        context.user_data["reg_step"] = 1  # Шаг 1: название команды
+        context.user_data["reg_data"] = {}
         await query.message.reply_text(
             "Отлично! ✌🏻\n\nДавайте зарегистрируем команду.\n\nВведите название команды 👇"
         )
     
     # Помощь
     elif data == "help_start":
-        context.user_data["waiting_for_question"] = True
+        context.user_data["help_mode"] = True
         keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
         await query.message.reply_text(
             "❓ Есть вопрос?\n\nНапишите ваш вопрос одним сообщением, и мы ответим в ближайшее время.",
@@ -195,7 +194,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Назад к городу
     elif data == "back_to_city":
-        context.user_data.pop("waiting_for_question", None)
+        context.user_data.pop("help_mode", None)
         game_text = GAME_INFO["Москва 11.04"]["text"]
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register_start")],
@@ -214,15 +213,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Обработка кнопок легионера
     elif data == "legioner_yes":
-        context.user_data["registration"]["legioner"] = "Да"
-        context.user_data["step"] = "captain"
+        context.user_data["reg_data"]["legioner"] = "Да"
+        context.user_data["reg_step"] = 4  # Шаг 4: данные капитана
         await query.message.reply_text(
             "Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
     
     elif data == "legioner_no":
-        context.user_data["registration"]["legioner"] = "Нет"
-        context.user_data["step"] = "captain"
+        context.user_data["reg_data"]["legioner"] = "Нет"
+        context.user_data["reg_step"] = 4  # Шаг 4: данные капитана
         await query.message.reply_text(
             "Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
@@ -233,9 +232,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.full_name
     text = update.message.text.strip()
     
-    # Проверяем, ждем ли вопрос
-    if context.user_data.get("waiting_for_question"):
-        # Отправляем вопрос админу
+    # Проверяем режим помощи
+    if context.user_data.get("help_mode"):
         admin_message = (
             f"❓ Вопрос от пользователя\n\n"
             f"👤 Имя: {user_name}\n"
@@ -255,25 +253,27 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Ошибка отправки вопроса: {e}")
             await update.message.reply_text("❌ Ошибка отправки вопроса. Попробуйте позже.")
         
-        context.user_data.pop("waiting_for_question", None)
+        context.user_data.pop("help_mode", None)
         return
     
-    # Проверяем, идет ли регистрация
-    if "registration" in context.user_data:
-        reg = context.user_data["registration"]
-        step = context.user_data.get("step")
+    # Проверяем режим регистрации
+    reg_step = context.user_data.get("reg_step")
+    
+    if reg_step:
+        reg_data = context.user_data.get("reg_data", {})
         
         # Шаг 1: название команды
-        if step == "team_name":
+        if reg_step == 1:
             if len(text) > 50:
                 await update.message.reply_text("Название слишком длинное (макс 50 символов). Введите название 👇")
                 return
-            reg["team_name"] = text
-            context.user_data["step"] = "player_count"
+            reg_data["team_name"] = text
+            context.user_data["reg_data"] = reg_data
+            context.user_data["reg_step"] = 2
             await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
         
         # Шаг 2: количество игроков
-        elif step == "player_count":
+        elif reg_step == 2:
             if not text.isdigit():
                 await update.message.reply_text("Пожалуйста, введите число (от 3 до 10):")
                 return
@@ -281,8 +281,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if count < 3 or count > 10:
                 await update.message.reply_text("Количество игроков должно быть от 3 до 10. Введите число:")
                 return
-            reg["player_count"] = text
-            context.user_data["step"] = "legioner"
+            reg_data["player_count"] = text
+            context.user_data["reg_data"] = reg_data
+            context.user_data["reg_step"] = 3
             
             keyboard = [
                 [
@@ -295,32 +296,34 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         
-        # Шаг 3: данные капитана
-        elif step == "captain":
+        # Шаг 3: легионер - этот шаг обрабатывается кнопками, не текстом
+        
+        # Шаг 4: данные капитана
+        elif reg_step == 4:
             if len(text) > 100:
                 await update.message.reply_text("Данные слишком длинные. Введите короче 👇")
                 return
             
-            reg["captain_info"] = text
-            reg["user_id"] = user_id
-            reg["user_name"] = user_name
-            reg["date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            reg_data["captain_info"] = text
+            reg_data["user_id"] = user_id
+            reg_data["user_name"] = user_name
+            reg_data["date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             # Сохраняем регистрацию
             data = load_data()
-            data["registrations"].append(reg.copy())
+            data["registrations"].append(reg_data.copy())
             save_data(data)
             
             # Сохраняем в Google Sheets
-            await save_to_google_sheets(reg)
+            await save_to_google_sheets(reg_data)
             
             # Отправляем подтверждение пользователю
             final_message = (
                 f"✅ Команда зарегистрирована!\n\n"
-                f"🏆 {reg['team_name']}\n"
-                f"👥 {reg['player_count']} игроков\n"
-                f"🌟 Легионер: {reg['legioner']}\n"
-                f"👨‍💼 Капитан: {reg['captain_info']}\n\n"
+                f"🏆 {reg_data['team_name']}\n"
+                f"👥 {reg_data['player_count']} игроков\n"
+                f"🌟 Легионер: {reg_data['legioner']}\n"
+                f"👨‍💼 Капитан: {reg_data['captain_info']}\n\n"
                 f"Ждем вас в субботу в баре «Золотая Вобла»!"
             )
             
@@ -331,10 +334,10 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             admin_message = (
                 f"🔔 НОВАЯ РЕГИСТРАЦИЯ!\n\n"
                 f"🎮 Игра: Москва 11.04\n"
-                f"🏆 Команда: {reg['team_name']}\n"
-                f"👥 Игроков: {reg['player_count']}\n"
-                f"🌟 Легионер: {reg['legioner']}\n"
-                f"👨‍💼 Капитан: {reg['captain_info']}\n"
+                f"🏆 Команда: {reg_data['team_name']}\n"
+                f"👥 Игроков: {reg_data['player_count']}\n"
+                f"🌟 Легионер: {reg_data['legioner']}\n"
+                f"👨‍💼 Капитан: {reg_data['captain_info']}\n"
                 f"👤 От: {user_name}\n"
                 f"🆔 ID: {user_id}"
             )
@@ -346,7 +349,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Ошибка отправки админу {admin_id}: {e}")
             
             # Очищаем данные регистрации
-            context.user_data.clear()
+            context.user_data.pop("reg_step", None)
+            context.user_data.pop("reg_data", None)
     
     else:
         # Если ничего не ожидаем, показываем главное меню
@@ -358,7 +362,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Статистика для админов"""
     user_id = update.effective_user.id
     
-    # Проверяем, админ ли это
     if user_id not in [SPECIFIC_ADMIN_ID, SECOND_ADMIN_ID]:
         await update.message.reply_text("⛔️ У вас нет доступа к этой команде")
         return
@@ -405,14 +408,12 @@ def main():
     print(f"❓ Вопросы: {HELP_ADMIN_ID}")
     print("=" * 50)
     
-    # Запускаем бота с увеличенным таймаутом
+    # Запускаем бота
     application.run_polling(
         drop_pending_updates=True,
         timeout=60,
         read_timeout=60,
-        write_timeout=60,
-        connect_timeout=60,
-        pool_timeout=60
+        write_timeout=60
     )
 
 if __name__ == "__main__":
