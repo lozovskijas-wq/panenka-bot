@@ -162,11 +162,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("Введите название команды 👇")
     
     elif action == "legioner_yes":
+        logger.info("Кнопка ДА нажата, сохраняем легионера")
         context.user_data['legioner'] = "Да"
         context.user_data['step'] = 'captain'
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
     
     elif action == "legioner_no":
+        logger.info("Кнопка НЕТ нажата, сохраняем легионера")
         context.user_data['legioner'] = "Нет"
         context.user_data['step'] = 'captain'
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
@@ -175,6 +177,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка текстовых сообщений"""
     user = update.effective_user
     text = update.message.text.strip()
+    
+    logger.info(f"Сообщение от {user.id}: '{text}', step={context.user_data.get('step')}")
     
     # Режим помощи
     if context.user_data.get('help_mode'):
@@ -218,6 +222,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Шаг 3: Данные капитана (принимаем ЛЮБОЙ текст)
     if step == 'captain':
+        logger.info(f"Шаг captain: получен текст '{text}'")
+        
         # Сохраняем всё, что ввел пользователь
         context.user_data['captain'] = text
         
@@ -225,12 +231,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         registration = {
             'team': context.user_data.get('team', ''),
             'players': context.user_data.get('players', ''),
-            'legioner': context.user_data.get('legioner', ''),
+            'legioner': context.user_data.get('legioner', 'Не указано'),
             'captain': text,
             'user_id': user.id,
             'user_name': user.full_name,
             'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        
+        logger.info(f"Сохраняем регистрацию: {registration}")
         
         # Сохраняем в JSON
         data = load_data()
@@ -245,8 +253,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for admin_id in ADMIN_IDS:
             try:
                 await context.bot.send_message(chat_id=admin_id, text=admin_msg)
-            except:
-                pass
+                logger.info(f"Уведомление отправлено админу {admin_id}")
+            except Exception as e:
+                logger.error(f"Ошибка отправки админу {admin_id}: {e}")
         
         # Ответ пользователю
         result = f"✅ Команда зарегистрирована!\n\n🏆 {registration['team']}\n👥 {registration['players']} игроков\n🌟 Легионер: {registration['legioner']}\n👨‍💼 Капитан: {registration['captain']}\n\nЖдем вас!"
@@ -296,7 +305,7 @@ def main():
     print("✅ БОТ ЗАПУЩЕН!")
     print("=" * 50)
     
-    # Запускаем бота с очисткой
+    # Запускаем бота
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
