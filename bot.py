@@ -4,9 +4,12 @@ import os
 import base64
 import gspread
 import asyncio
+import signal
+import sys
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from flask import Flask
 
 # Переменные окружения
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -16,10 +19,20 @@ SPREADSHEET_ID = "1PCGcpWlACOpvs90NjKenKu8lhPF1aoMpUUp6SBlLGXM"
 
 if not BOT_TOKEN:
     print("ERROR: BOT_TOKEN is not set")
-    exit(1)
+    sys.exit(1)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Flask приложение для health check
+flask_app = Flask('')
+
+@flask_app.route('/')
+def home():
+    return "OK"
+
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=10000)
 
 # Восстановление credentials.json
 if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
@@ -69,7 +82,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = query.data
     logger.info(f"Кнопка: {action}")
     
-    # ===== КНОПКА ГОРОДА =====
     if action == "city_moscow":
         text = """📍 Москва – 11 апреля (суббота)
 
@@ -93,19 +105,16 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
-    # ===== КНОПКА НАЗАД В ГЛАВНОЕ МЕНЮ =====
     elif action == "back":
         text = "Выберите город:"
         keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
         await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
-    # ===== КНОПКА ПОМОЩЬ =====
     elif action == "help":
         context.user_data['help_mode'] = True
         keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
         await query.message.reply_text("❓ Напишите ваш вопрос одним сообщением:", reply_markup=InlineKeyboardMarkup(keyboard))
     
-    # ===== КНОПКА НАЗАД К ГОРОДУ =====
     elif action == "back_to_city":
         text = """📍 Москва – 11 апреля (суббота)
 
@@ -125,13 +134,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
-    # ===== КНОПКА РЕГИСТРАЦИЯ =====
     elif action == "register":
         context.user_data['reg'] = {}
         context.user_data['step'] = 'team'
         await query.message.reply_text("Введите название команды 👇")
     
-    # ===== КНОПКИ ЛЕГИОНЕРА =====
     elif action == "legioner_yes":
         context.user_data['reg']['legioner'] = "Да"
         context.user_data['step'] = 'captain'
@@ -147,7 +154,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text.strip()
     
-    # ===== РЕЖИМ ПОМОЩИ =====
     if context.user_data.get('help_mode'):
         msg = f"❓ Вопрос от {user.full_name} (@{user.username})\n\n{text}"
         await context.bot.send_message(chat_id=HELP_ADMIN_ID, text=msg)
@@ -155,12 +161,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('help_mode', None)
         return
     
-    # ===== РЕЖИМ РЕГИСТРАЦИИ =====
     if 'reg' in context.user_data:
         reg = context.user_data['reg']
         step = context.user_data.get('step')
         
-        # Шаг 1: название команды
         if step == 'team':
             if len(text) > 50:
                 await update.message.reply_text("Название слишком длинное (до 50 символов). Попробуйте еще:")
@@ -169,7 +173,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['step'] = 'players'
             await update.message.reply_text("Сколько игроков? (от 3 до 10)")
         
-        # Шаг 2: количество игроков
         elif step == 'players':
             if not text.isdigit():
                 await update.message.reply_text("Введите число от 3 до 10:")
@@ -186,22 +189,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             await update.message.reply_text("Готовы взять легионера (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
         
-        # Шаг 4: данные капитана
         elif step == 'captain':
             reg['captain'] = text
             reg['user_id'] = user.id
             reg['user_name'] = user.full_name
             reg['date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Сохраняем
             data = load_data()
             data['registrations'].append(reg)
             save_data(data)
             
-            # Сохраняем в Google Sheets
             await save_to_google_sheets(reg)
             
-            # Уведомление админам
             admin_msg = f"🔔 НОВАЯ РЕГИСТРАЦИЯ!\n\nКоманда: {reg['team']}\nИгроков: {reg['players']}\nЛегионер: {reg['legioner']}\nКапитан: {reg['captain']}\nОт: {user.full_name}"
             for admin_id in ADMIN_IDS:
                 try:
@@ -209,16 +208,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     pass
             
-            # Ответ пользователю
             result = f"✅ Команда зарегистрирована!\n\n🏆 {reg['team']}\n👥 {reg['players']} игроков\n🌟 Легионер: {reg['legioner']}\n👨‍💼 Капитан: {reg['captain']}\n\nЖдем вас!"
             keyboard = [[InlineKeyboardButton("🔙 В главное меню", callback_data="back")]]
             await update.message.reply_text(result, reply_markup=InlineKeyboardMarkup(keyboard))
             
-            # Очищаем
             context.user_data.clear()
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Статистика для админов"""
     if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("⛔️ Доступ запрещен")
         return
@@ -227,38 +223,29 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📊 Всего зарегистрировано команд: {count}")
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена"""
     context.user_data.clear()
     await update.message.reply_text("❌ Отменено")
     await start(update, context)
 
 # ============ ЗАПУСК ============
 
-async def cleanup_webhook():
-    """Очистка вебхука перед запуском"""
-    try:
-        from telegram.ext import ApplicationBuilder
-        temp_app = ApplicationBuilder().token(BOT_TOKEN).build()
-        await temp_app.bot.delete_webhook(drop_pending_updates=True)
-        print("✅ Вебхук очищен")
-    except Exception as e:
-        print(f"Ошибка очистки вебхука: {e}")
-
 async def main():
-    # Очищаем вебхук перед запуском
-    await cleanup_webhook()
-    
+    # Создаем приложение
     app = Application.builder().token(BOT_TOKEN).build()
     
+    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("cancel", cancel))
     app.add_handler(CallbackQueryHandler(button_click))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("✅ БОТ ЗАПУЩЕН! Все кнопки работают!")
+    print("✅ БОТ ЗАПУЩЕН!")
     
-    # Запускаем с очисткой старых обновлений
+    # Запускаем бота с очисткой вебхука
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    
+    # Запускаем polling
     await app.initialize()
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
@@ -267,10 +254,21 @@ async def main():
     try:
         while True:
             await asyncio.sleep(3600)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
         await app.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Запускаем Flask в отдельном потоке
+    from threading import Thread
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
+    # Запускаем бота
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Бот остановлен")
+    except Exception as e:
+        print(f"Ошибка: {e}")
