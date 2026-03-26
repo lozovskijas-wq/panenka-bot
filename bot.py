@@ -251,7 +251,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
+    """Обработчик команды /start - полностью сбрасывает состояние"""
     context.user_data.clear()
     return await send_main_menu(update, context)
 
@@ -541,7 +541,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действия"""
+    """Отмена действия - обрабатывает команду /cancel"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
     return await send_main_menu(update, context)
@@ -553,39 +553,51 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
+        # Добавляем обработчик команды /start на верхнем уровне (вне ConversationHandler)
+        # чтобы он всегда срабатывал
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("cancel", cancel))
+
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
                 CITY_SELECTED: [
                     CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                    CallbackQueryHandler(game_selected),  # Для кнопок "Назад" и др.
+                    CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                    CallbackQueryHandler(game_selected),  # Для кнопок "Назад" и др.
+                    CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
                 REGISTER_LEGIONER: [
-                    CallbackQueryHandler(game_selected),  # Для кнопок "Да"/"Нет" и "Назад"
+                    CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                    CallbackQueryHandler(game_selected),  # Для кнопок "Назад" и др.
+                    CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),  # Для кнопки "Назад"
+                    CallbackQueryHandler(game_selected),
+                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
                 ],
             },
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
-                CallbackQueryHandler(game_selected),  # Для обработки кнопок в fallback
+                CallbackQueryHandler(game_selected),
             ],
         )
 
