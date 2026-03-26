@@ -306,7 +306,8 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
+    """Обработчик команды /start - полностью сбрасывает состояние и показывает главное меню"""
+    context.user_data.clear()
     return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -552,9 +553,11 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода данных капитана - ИСПРАВЛЕН!"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Проверяем, что это не команда
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -563,6 +566,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     if not captain_info:
         await update.message.reply_text("Данные капитана не могут быть пустыми. Введите имя и телефон 👇")
         return REGISTER_CAPTAIN
+    
+    logger.info(f"ПОЛУЧЕНЫ ДАННЫЕ КАПИТАНА: {captain_info}")
     
     user = update.effective_user
     selected_game = context.user_data.get("selected_game", "")
@@ -695,56 +700,56 @@ def main():
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 CITY_SELECTED: [
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлено!
+                    CommandHandler("start", start),
                 ],
             },
             fallbacks=[
