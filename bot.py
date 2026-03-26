@@ -234,27 +234,28 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_city_info(update, context)
         return CITY_MENU
     
-    # Обработка кнопок меню города
+    # Обработка кнопки "Заявить команду"
     elif callback_data == "register_team":
-        await query.edit_message_text(
+        await query.message.reply_text(
             "Отлично! ✌🏻\n\nДавайте зарегистрируем команду.\n\nВведите название команды 👇"
         )
         return TEAM_NAME
     
+    # Обработка кнопки "Помощь"
     elif callback_data == "help_city":
         help_text = (
             "❓ Есть вопрос?\n\n"
             "Напишите ваш вопрос одним сообщением, и мы ответим в ближайшее время."
         )
         keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
-        await query.edit_message_text(
+        await query.message.reply_text(
             help_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return CITY_MENU
     
+    # Обработка кнопки "Назад в главное меню"
     elif callback_data == "back_to_main":
-        # Возврат в главное меню
         games = load_data().get("games", [])
         keyboard = []
         for game in games:
@@ -266,12 +267,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Выберите город и дату 👇"
         )
         
-        await query.edit_message_text(
+        await query.message.reply_text(
             text=welcome_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return MAIN_MENU
     
+    # Обработка кнопки "Назад" в меню города
     elif callback_data == "back_to_city":
         await show_city_info(update, context)
         return CITY_MENU
@@ -279,14 +281,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Обработка кнопок легионера
     elif callback_data == "legioner_yes":
         context.user_data["legioner"] = "Да"
-        await query.edit_message_text(
+        await query.message.reply_text(
             "Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
         return CAPTAIN_INFO
     
     elif callback_data == "legioner_no":
         context.user_data["legioner"] = "Нет"
-        await query.edit_message_text(
+        await query.message.reply_text(
             "Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
         return CAPTAIN_INFO
@@ -325,12 +327,15 @@ async def show_city_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo_file = game_info.get('photo')
     if os.path.exists(photo_file):
         with open(photo_file, 'rb') as photo:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=menu_text),
+            # Отправляем новое сообщение с фото
+            await query.message.reply_photo(
+                photo=photo,
+                caption=menu_text,
                 reply_markup=reply_markup
             )
     else:
-        await query.edit_message_text(
+        # Отправляем новое текстовое сообщение
+        await query.message.reply_text(
             text=menu_text,
             reply_markup=reply_markup
         )
@@ -396,7 +401,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Пожалуйста, введите имя и телефон капитана:")
         return CAPTAIN_INFO
     
-    # Разделяем имя и телефон (простое разделение по запятой)
+    # Разделяем имя и телефон
     captain_parts = captain_info.split(',')
     captain_name = captain_parts[0].strip() if len(captain_parts) > 0 else captain_info
     captain_phone = captain_parts[1].strip() if len(captain_parts) > 1 else "не указан"
@@ -466,7 +471,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 async def help_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик сообщений с вопросами"""
     if update.message.text.startswith('/'):
-        await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return
     
     help_text = update.message.text.strip()
@@ -512,12 +516,14 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     registrations = data.get("registrations", [])
     
     stats = "📊 Статистика регистраций:\n\n"
+    total = 0
     for game in data.get("games", []):
         count = len([r for r in registrations if r.get("selected_game") == game])
         if count > 0:
             stats += f"🏆 {game}: {count} команд\n"
+            total += count
     
-    stats += f"\n📈 Всего: {len(registrations)} команд"
+    stats += f"\n📈 Всего команд: {total}"
     
     await update.message.reply_text(stats)
 
@@ -563,7 +569,8 @@ def main():
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_handler))
         
         print("✅ Бот запущен и готов к работе!")
-        print(f"👑 Админы: {get_registration_admin_ids()}")
+        print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
+        print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
         
         application.run_polling(drop_pending_updates=True)
         
