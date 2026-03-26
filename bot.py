@@ -223,33 +223,18 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Отправляем текст с кнопками (без фото, чтобы гарантированно работало)
     if update.callback_query:
         message = update.callback_query.message
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            await message.reply_text(
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
+        await message.reply_text(
+            text=welcome_text,
+            reply_markup=reply_markup
+        )
     else:
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            await update.message.reply_text(
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
+        await update.message.reply_text(
+            text=welcome_text,
+            reply_markup=reply_markup
+        )
     
     return MAIN_MENU
 
@@ -397,18 +382,25 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Пробуем отправить фото, если есть
     if os.path.exists(photo_file):
-        with open(photo_file, 'rb') as photo:
-            await query.message.reply_photo(
-                photo=photo,
-                caption=menu_text,
-                reply_markup=reply_markup
-            )
-    else:
-        await query.message.reply_text(
-            text=menu_text,
-            reply_markup=reply_markup
-        )
+        try:
+            with open(photo_file, 'rb') as photo:
+                await query.message.reply_photo(
+                    photo=photo,
+                    caption=menu_text,
+                    reply_markup=reply_markup
+                )
+                return CITY_SELECTED
+        except Exception as e:
+            logger.error(f"Ошибка отправки фото: {e}")
+    
+    # Если фото нет или ошибка, отправляем текст
+    await query.message.reply_text(
+        text=menu_text,
+        reply_markup=reply_markup
+    )
+    return CITY_SELECTED
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.message.reply_text("Для этой игры нет акции.")
@@ -624,7 +616,7 @@ def main():
                     CallbackQueryHandler(game_selected),
                 ],
                 CITY_SELECTED: [
-                    CallbackQueryHandler(game_selected),  # Добавлен обработчик кнопок!
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
