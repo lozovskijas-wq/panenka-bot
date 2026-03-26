@@ -3,6 +3,7 @@ import logging
 import os
 import base64
 import gspread
+import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -233,7 +234,20 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ============ ЗАПУСК ============
 
-def main():
+async def cleanup_webhook():
+    """Очистка вебхука перед запуском"""
+    try:
+        from telegram.ext import ApplicationBuilder
+        temp_app = ApplicationBuilder().token(BOT_TOKEN).build()
+        await temp_app.bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Вебхук очищен")
+    except Exception as e:
+        print(f"Ошибка очистки вебхука: {e}")
+
+async def main():
+    # Очищаем вебхук перед запуском
+    await cleanup_webhook()
+    
     app = Application.builder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
@@ -244,7 +258,19 @@ def main():
     
     print("✅ БОТ ЗАПУЩЕН! Все кнопки работают!")
     
-    app.run_polling(drop_pending_updates=True)
+    # Запускаем с очисткой старых обновлений
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling(drop_pending_updates=True)
+    
+    # Держим бота запущенным
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await app.stop()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
