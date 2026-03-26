@@ -73,7 +73,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     text = "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\nВыберите город:"
     keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    # Проверяем наличие logo.jpg
+    if os.path.exists('logo.jpg'):
+        with open('logo.jpg', 'rb') as photo:
+            await update.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик всех кнопок"""
@@ -103,12 +109,23 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register")],
             [InlineKeyboardButton("❓ Помощь", callback_data="help"), InlineKeyboardButton("🔙 Назад", callback_data="back")]
         ]
-        await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        
+        # Проверяем наличие photo1.jpg
+        if os.path.exists('photo1.jpg'):
+            with open('photo1.jpg', 'rb') as photo:
+                await query.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif action == "back":
         text = "Выберите город:"
         keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
-        await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        
+        if os.path.exists('logo.jpg'):
+            with open('logo.jpg', 'rb') as photo:
+                await query.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif action == "help":
         context.user_data['help_mode'] = True
@@ -132,7 +149,12 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register")],
             [InlineKeyboardButton("❓ Помощь", callback_data="help"), InlineKeyboardButton("🔙 Назад", callback_data="back")]
         ]
-        await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        
+        if os.path.exists('photo1.jpg'):
+            with open('photo1.jpg', 'rb') as photo:
+                await query.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif action == "register":
         context.user_data['reg'] = {}
@@ -142,18 +164,21 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "legioner_yes":
         context.user_data['reg']['legioner'] = "Да"
         context.user_data['step'] = 'captain'
-        await query.message.reply_text("Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67")
+        # Убрал пример, оставил только текст
+        await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
     
     elif action == "legioner_no":
         context.user_data['reg']['legioner'] = "Нет"
         context.user_data['step'] = 'captain'
-        await query.message.reply_text("Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67")
+        # Убрал пример, оставил только текст
+        await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик текстовых сообщений"""
     user = update.effective_user
     text = update.message.text.strip()
     
+    # Режим помощи
     if context.user_data.get('help_mode'):
         msg = f"❓ Вопрос от {user.full_name} (@{user.username})\n\n{text}"
         await context.bot.send_message(chat_id=HELP_ADMIN_ID, text=msg)
@@ -161,18 +186,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('help_mode', None)
         return
     
+    # Режим регистрации
     if 'reg' in context.user_data:
         reg = context.user_data['reg']
         step = context.user_data.get('step')
         
+        # Шаг 1: название команды
         if step == 'team':
             if len(text) > 50:
                 await update.message.reply_text("Название слишком длинное (до 50 символов). Попробуйте еще:")
+                return
+            if not text:
+                await update.message.reply_text("Название не может быть пустым. Введите название:")
                 return
             reg['team'] = text
             context.user_data['step'] = 'players'
             await update.message.reply_text("Сколько игроков? (от 3 до 10)")
         
+        # Шаг 2: количество игроков
         elif step == 'players':
             if not text.isdigit():
                 await update.message.reply_text("Введите число от 3 до 10:")
@@ -189,18 +220,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             await update.message.reply_text("Готовы взять легионера (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
         
+        # Шаг 3: данные капитана (принимаем любой текст)
         elif step == 'captain':
+            if len(text) > 200:
+                await update.message.reply_text("Данные слишком длинные. Введите короче:")
+                return
+            if not text:
+                await update.message.reply_text("Пожалуйста, введите имя и телефон капитана:")
+                return
+            
+            # Сохраняем данные капитана как есть, без разделения
             reg['captain'] = text
             reg['user_id'] = user.id
             reg['user_name'] = user.full_name
             reg['date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
+            # Сохраняем регистрацию
             data = load_data()
             data['registrations'].append(reg)
             save_data(data)
             
+            # Сохраняем в Google Sheets
             await save_to_google_sheets(reg)
             
+            # Уведомление админам
             admin_msg = f"🔔 НОВАЯ РЕГИСТРАЦИЯ!\n\nКоманда: {reg['team']}\nИгроков: {reg['players']}\nЛегионер: {reg['legioner']}\nКапитан: {reg['captain']}\nОт: {user.full_name}"
             for admin_id in ADMIN_IDS:
                 try:
@@ -208,10 +251,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     pass
             
+            # Ответ пользователю
             result = f"✅ Команда зарегистрирована!\n\n🏆 {reg['team']}\n👥 {reg['players']} игроков\n🌟 Легионер: {reg['legioner']}\n👨‍💼 Капитан: {reg['captain']}\n\nЖдем вас!"
             keyboard = [[InlineKeyboardButton("🔙 В главное меню", callback_data="back")]]
             await update.message.reply_text(result, reply_markup=InlineKeyboardMarkup(keyboard))
             
+            # Очищаем данные
             context.user_data.clear()
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -241,6 +286,8 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("✅ БОТ ЗАПУЩЕН!")
+    print(f"📁 Текущая директория: {os.getcwd()}")
+    print(f"🖼️ Файлы в директории: {os.listdir('.')}")
     
     # Запускаем бота с очисткой вебхука
     await app.bot.delete_webhook(drop_pending_updates=True)
