@@ -138,6 +138,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_photo(photo, caption=welcome_text, reply_markup=reply_markup)
     else:
         await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    
+    return  # Добавляем return
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик всех кнопок"""
@@ -213,6 +215,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Обработка кнопок легионера
     elif data == "legioner_yes":
+        if "reg_data" not in context.user_data:
+            context.user_data["reg_data"] = {}
         context.user_data["reg_data"]["legioner"] = "Да"
         context.user_data["reg_step"] = 4  # Шаг 4: данные капитана
         await query.message.reply_text(
@@ -220,6 +224,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif data == "legioner_no":
+        if "reg_data" not in context.user_data:
+            context.user_data["reg_data"] = {}
         context.user_data["reg_data"]["legioner"] = "Нет"
         context.user_data["reg_step"] = 4  # Шаг 4: данные капитана
         await query.message.reply_text(
@@ -260,12 +266,19 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reg_step = context.user_data.get("reg_step")
     
     if reg_step:
-        reg_data = context.user_data.get("reg_data", {})
+        # Убеждаемся что reg_data существует
+        if "reg_data" not in context.user_data:
+            context.user_data["reg_data"] = {}
+        
+        reg_data = context.user_data["reg_data"]
         
         # Шаг 1: название команды
         if reg_step == 1:
             if len(text) > 50:
                 await update.message.reply_text("Название слишком длинное (макс 50 символов). Введите название 👇")
+                return
+            if not text:
+                await update.message.reply_text("Название не может быть пустым. Введите название 👇")
                 return
             reg_data["team_name"] = text
             context.user_data["reg_data"] = reg_data
@@ -296,12 +309,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         
-        # Шаг 3: легионер - этот шаг обрабатывается кнопками, не текстом
-        
         # Шаг 4: данные капитана
         elif reg_step == 4:
             if len(text) > 100:
                 await update.message.reply_text("Данные слишком длинные. Введите короче 👇")
+                return
+            if not text:
+                await update.message.reply_text("Пожалуйста, введите имя и телефон капитана:")
                 return
             
             reg_data["captain_info"] = text
