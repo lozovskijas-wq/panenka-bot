@@ -206,8 +206,8 @@ def save_to_google_sheets(registration: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
-async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, message_obj=None):
-    """Показывает главное меню (работает и с message, и с callback_query)"""
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -235,32 +235,23 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, mes
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    if message_obj:
-        target = message_obj
-    elif update.callback_query:
-        target = update.callback_query.message
-    else:
-        target = update.message
-    
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            await target.reply_photo(
+            await update.message.reply_photo(
                 photo=photo,
                 caption=welcome_text,
                 reply_markup=reply_markup
             )
     else:
-        await target.reply_text(
+        await update.message.reply_text(
             text=welcome_text,
             reply_markup=reply_markup
         )
     
     return MAIN_MENU
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await show_main_menu(update, context)
-
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик всех кнопок"""
     query = update.callback_query
     await query.answer()
     
@@ -279,7 +270,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selected_game = games[game_index]
                 
                 if not GAME_INFO.get(selected_game, {}).get("active", False):
-                    await query.message.reply_text("Эта игра уже недоступна для регистрации.")
+                    await query.edit_message_text("Эта игра уже недоступна для регистрации.")
                     return MAIN_MENU
                 
                 context.user_data["selected_game"] = selected_game
@@ -288,21 +279,24 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_city_menu(update, context)
                 return CITY_SELECTED
             else:
-                await query.message.reply_text("Ошибка: игра не найдена")
+                await query.edit_message_text("Ошибка: игра не найдена")
                 return MAIN_MENU
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
-            await query.message.reply_text("Ошибка при выборе города")
+            await query.edit_message_text("Ошибка при выборе города")
             return MAIN_MENU
     
     # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
-        return await show_main_menu(update, context, query.message)
+        context.user_data.clear()
+        await start(update, context)
+        return MAIN_MENU
     
-    # Кнопка "Назад к выбору города" - для помощи и других мест
+    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
-            return await show_main_menu(update, context, query.message)
+            await start(update, context)
+            return MAIN_MENU
         await show_city_menu(update, context)
         return CITY_SELECTED
     
@@ -315,7 +309,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]
         ]
-        await query.message.reply_text(
+        await query.edit_message_text(
             help_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -323,7 +317,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка "Заявить команду"
     elif callback_data == "start_registration":
-        await query.message.reply_text(
+        await query.edit_message_text(
             f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
         )
         return REGISTER_TEAM
@@ -334,21 +328,23 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["legioner"] = legioner_answer
         logger.info(f"Легионер: {legioner_answer}")
         
-        await query.message.reply_text(
+        await query.edit_message_text(
             text="Напишите имя и номер телефона капитана 👇"
         )
         return REGISTER_CAPTAIN
     
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
+        await start(update, context)
         return MAIN_MENU
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает меню для выбранного города"""
     query = update.callback_query
     selected_game = context.user_data.get("selected_game")
     
     if not selected_game:
-        await query.message.reply_text("Ошибка: город не выбран")
+        await query.edit_message_text("Ошибка: город не выбран")
         return MAIN_MENU
     
     game_info = GAME_INFO.get(selected_game, {})
@@ -379,18 +375,18 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists(photo_file):
         with open(photo_file, 'rb') as photo:
-            await query.message.reply_photo(
-                photo=photo,
-                caption=menu_text,
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=menu_text),
                 reply_markup=reply_markup
             )
     else:
-        await query.message.reply_text(
+        await query.edit_message_text(
             text=menu_text,
             reply_markup=reply_markup
         )
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода названия команды"""
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return REGISTER_TEAM
@@ -408,6 +404,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода количества игроков"""
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return REGISTER_PLAYERS
@@ -445,6 +442,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ответа про легионера"""
     query = update.callback_query
     await query.answer()
     
@@ -453,12 +451,13 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Легионер: {legioner_answer}")
     
-    await query.message.reply_text(
+    await query.edit_message_text(
         text="Напишите имя и номер телефона капитана 👇"
     )
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода данных капитана"""
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -526,6 +525,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода вопроса"""
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
@@ -559,9 +559,10 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
-    return await show_main_menu(update, context)
+    return await start(update, context)
 
 def main():
     Thread(target=run_web, daemon=True).start()
@@ -593,7 +594,7 @@ def main():
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),  # Добавлен для кнопки "Назад"
+                    CallbackQueryHandler(game_selected),
                 ],
             },
             fallbacks=[
