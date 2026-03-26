@@ -8,13 +8,6 @@ import requests
 import gspread
 import asyncio
 import signal
-async def shutdown(signal, loop):
-    """Gracefully shutdown the bot"""
-    logger.info(f"Received exit signal {signal.name}...")
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    await asyncio.gather(*tasks, return_exceptions=True)
-    loop.stop()
 from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
@@ -30,7 +23,13 @@ from telegram.ext import (
     ContextTypes,
 )
 from flask import Flask
-
+async def shutdown(signal, loop):
+    """Gracefully shutdown the bot"""
+    logger.info(f"Received exit signal {signal.name}...")
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    await asyncio.gather(*tasks, return_exceptions=True)
+    loop.stop()
 # Константа для таймаута сессии (в секундах)
 SESSION_TIMEOUT = 300  # 5 минут
 
