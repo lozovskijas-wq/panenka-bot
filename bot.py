@@ -62,7 +62,7 @@ if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
 GAME_INFO = {
     "Москва 11.04": {
         "active": True,
-        "text": "📍 Москва – 11 апреля (суббота)\n\n🏟️ Бар «Золотая Вобла»\n📫 Протоповоский пер, 3\n\n🕖 Двери открыты с 16:00\n⚽️ Старт игры – 16:20\n\n💰 Стоимость участия:\n800₽ – в джерси любого клуба или сборной\n1 000₽ – в обычной одежде"
+        "text": "📍 Москва – 11 апреля (суббота)\n\n🏟️ Бар «Золотая Вобла»\n📫 Протоповоский пер, 3\n\n🕖 Двери открыты с 16:00\n⚽️ Старт игры – 16:20\n\n💰 Стоимость участия:\n800₽ – в джерси любого клуба или сборной\n1 000₽ – в обычной одежде\n\nЕсли команда уже заявлена другим способом – повторная регистрация не нужна.\n\nЕсли команда ещё не заявлена – сейчас самое время это сделать."
     }
 }
 
@@ -121,6 +121,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["users"][str(user_id)] = user_name
     save_data(data)
     
+    # Очищаем все данные пользователя
+    context.user_data.clear()
+    
     welcome_text = (
         "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
         "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
@@ -146,6 +149,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка города Москва
     if data == "city_moscow":
+        context.user_data["current_menu"] = "city"
         game_text = GAME_INFO["Москва 11.04"]["text"]
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register_start")],
@@ -165,19 +169,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Начать регистрацию
     elif data == "register_start":
         context.user_data["registration"] = {}
+        context.user_data["step"] = "team_name"
         await query.message.reply_text(
             "Отлично! ✌🏻\n\nДавайте зарегистрируем команду.\n\nВведите название команды 👇"
         )
     
     # Помощь
     elif data == "help_start":
-        await query.message.reply_text(
-            "❓ Есть вопрос?\n\nНапишите ваш вопрос одним сообщением, и мы ответим в ближайшее время."
-        )
         context.user_data["waiting_for_question"] = True
+        keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
+        await query.message.reply_text(
+            "❓ Есть вопрос?\n\nНапишите ваш вопрос одним сообщением, и мы ответим в ближайшее время.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     
     # Назад в главное меню
     elif data == "back_main":
+        context.user_data.clear()
         welcome_text = (
             "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
             "Выберите город и дату 👇"
@@ -185,15 +193,36 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
         await query.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard))
     
+    # Назад к городу
+    elif data == "back_to_city":
+        context.user_data.pop("waiting_for_question", None)
+        game_text = GAME_INFO["Москва 11.04"]["text"]
+        keyboard = [
+            [InlineKeyboardButton("📄 Заявить команду", callback_data="register_start")],
+            [
+                InlineKeyboardButton("❓ Помощь", callback_data="help_start"),
+                InlineKeyboardButton("🔙 Назад", callback_data="back_main")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if os.path.exists('photo1.jpg'):
+            with open('photo1.jpg', 'rb') as photo:
+                await query.message.reply_photo(photo, caption=game_text, reply_markup=reply_markup)
+        else:
+            await query.message.reply_text(game_text, reply_markup=reply_markup)
+    
     # Обработка кнопок легионера
     elif data == "legioner_yes":
         context.user_data["registration"]["legioner"] = "Да"
+        context.user_data["step"] = "captain"
         await query.message.reply_text(
             "Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
     
     elif data == "legioner_no":
         context.user_data["registration"]["legioner"] = "Нет"
+        context.user_data["step"] = "captain"
         await query.message.reply_text(
             "Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
@@ -217,33 +246,34 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         try:
             await context.bot.send_message(chat_id=HELP_ADMIN_ID, text=admin_message)
+            keyboard = [[InlineKeyboardButton("🔙 В главное меню", callback_data="back_main")]]
             await update.message.reply_text(
                 "✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 В главное меню", callback_data="back_main")
-                ]])
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
         except Exception as e:
             logger.error(f"Ошибка отправки вопроса: {e}")
             await update.message.reply_text("❌ Ошибка отправки вопроса. Попробуйте позже.")
         
-        context.user_data["waiting_for_question"] = False
+        context.user_data.pop("waiting_for_question", None)
         return
     
     # Проверяем, идет ли регистрация
     if "registration" in context.user_data:
         reg = context.user_data["registration"]
+        step = context.user_data.get("step")
         
         # Шаг 1: название команды
-        if "team_name" not in reg:
+        if step == "team_name":
             if len(text) > 50:
                 await update.message.reply_text("Название слишком длинное (макс 50 символов). Введите название 👇")
                 return
             reg["team_name"] = text
+            context.user_data["step"] = "player_count"
             await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
         
         # Шаг 2: количество игроков
-        elif "player_count" not in reg:
+        elif step == "player_count":
             if not text.isdigit():
                 await update.message.reply_text("Пожалуйста, введите число (от 3 до 10):")
                 return
@@ -252,6 +282,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("Количество игроков должно быть от 3 до 10. Введите число:")
                 return
             reg["player_count"] = text
+            context.user_data["step"] = "legioner"
             
             keyboard = [
                 [
@@ -265,7 +296,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         
         # Шаг 3: данные капитана
-        elif "captain_info" not in reg:
+        elif step == "captain":
             if len(text) > 100:
                 await update.message.reply_text("Данные слишком длинные. Введите короче 👇")
                 return
@@ -315,10 +346,10 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Ошибка отправки админу {admin_id}: {e}")
             
             # Очищаем данные регистрации
-            del context.user_data["registration"]
+            context.user_data.clear()
     
     else:
-        # Если ничего не ожидаем, отправляем в главное меню
+        # Если ничего не ожидаем, показываем главное меню
         welcome_text = "Выберите город и дату 👇"
         keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
         await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -374,8 +405,15 @@ def main():
     print(f"❓ Вопросы: {HELP_ADMIN_ID}")
     print("=" * 50)
     
-    # Запускаем бота
-    application.run_polling(drop_pending_updates=True)
+    # Запускаем бота с увеличенным таймаутом
+    application.run_polling(
+        drop_pending_updates=True,
+        timeout=60,
+        read_timeout=60,
+        write_timeout=60,
+        connect_timeout=60,
+        pool_timeout=60
+    )
 
 if __name__ == "__main__":
     main()
