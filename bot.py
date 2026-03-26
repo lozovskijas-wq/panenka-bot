@@ -11,7 +11,7 @@ from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Bot
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -22,21 +22,6 @@ from telegram.ext import (
     ContextTypes,
 )
 from flask import Flask
-
-# Очистка вебхука при запуске
-async def cleanup():
-    try:
-        bot = Bot(token=os.environ.get('BOT_TOKEN'))
-        await bot.delete_webhook(drop_pending_updates=True)
-        print("✅ Вебхук очищен")
-    except Exception as e:
-        print(f"Ошибка очистки: {e}")
-
-# Запускаем очистку
-try:
-    asyncio.run(cleanup())
-except:
-    pass
 
 SESSION_TIMEOUT = 300
 
@@ -54,7 +39,10 @@ def home():
     return "OK"
 
 def run_web():
-    app.run(host='0.0.0.0', port=10000)
+    try:
+        app.run(host='0.0.0.0', port=10000, debug=False)
+    except:
+        pass
 
 if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
@@ -568,15 +556,27 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
 
 def main():
-    Thread(target=run_web, daemon=True).start()
-    logger.info("🌐 Веб-сервер запущен на порту 10000")
+    # Запускаем Flask в отдельном потоке с обработкой ошибки порта
+    try:
+        Thread(target=run_web, daemon=True).start()
+        logger.info("🌐 Веб-сервер запущен на порту 10000")
+    except Exception as e:
+        logger.warning(f"Не удалось запустить веб-сервер: {e}")
+
+    # Очистка вебхука
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        from telegram import Bot
+        bot = Bot(token=BOT_TOKEN)
+        loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
+        print("✅ Вебхук очищен")
+        loop.close()
+    except Exception as e:
+        print(f"Ошибка очистки: {e}")
 
     try:
         application = Application.builder().token(BOT_TOKEN).build()
-
-        # Добавляем отдельные обработчики команд
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
