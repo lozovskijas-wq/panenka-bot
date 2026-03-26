@@ -188,7 +188,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
     logger.info(f"Получено сообщение от {user.id}: '{text}'")
-    logger.info(f"Текущие данные пользователя: {context.user_data}")
+    logger.info(f"Текущий шаг: {context.user_data.get('step')}")
     
     # Режим помощи
     if context.user_data.get('help_mode'):
@@ -203,8 +203,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'reg' in context.user_data:
         reg = context.user_data['reg']
         step = context.user_data.get('step')
-        
-        logger.info(f"Режим регистрации, текущий шаг: {step}")
         
         # Шаг 1: название команды
         if step == 'team':
@@ -237,18 +235,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             await update.message.reply_text("Готовы взять легионера (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
         
-        # Шаг 3: данные капитана
+        # Шаг 3: данные капитана - ПРИНИМАЕМ ЛЮБОЙ ТЕКСТ БЕЗ ПРОВЕРОК
         elif step == 'captain':
-            logger.info(f"Шаг captain: получены данные капитана: {text}")
+            logger.info(f"Шаг captain: получены данные: {text}")
             
-            if len(text) > 200:
-                await update.message.reply_text("Данные слишком длинные. Введите короче:")
-                return
-            if not text:
-                await update.message.reply_text("Пожалуйста, введите имя и телефон капитана:")
-                return
-            
-            # Сохраняем данные
+            # Просто сохраняем любой текст, который ввел пользователь
             reg['captain'] = text
             reg['user_id'] = user.id
             reg['user_name'] = user.full_name
