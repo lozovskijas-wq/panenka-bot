@@ -433,6 +433,18 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     )
     return REGISTER_LEGIONER
 
+async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ответа про легионера"""
+    query = update.callback_query
+    await query.answer()
+    
+    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
+    context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
+    
+    await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
+    return REGISTER_CAPTAIN
+
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода данных капитана"""
     if update.message.text.startswith('/'):
@@ -563,35 +575,36 @@ def main():
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
                 CITY_SELECTED: [
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
                 REGISTER_LEGIONER: [
+                    CallbackQueryHandler(legioner_received),  # Добавлен обработчик кнопок для легионера
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                     CallbackQueryHandler(game_selected),
-                    CommandHandler("start", start),  # Добавлен для /start из этого состояния
+                    CommandHandler("start", start),
                 ],
             },
             fallbacks=[
