@@ -24,8 +24,10 @@ from telegram.ext import (
 )
 from flask import Flask
 
-SESSION_TIMEOUT = 300
+# Константа для таймаута сессии (в секундах)
+SESSION_TIMEOUT = 300  # 5 минут
 
+# Обработка сигналов для корректного завершения
 def signal_handler(sig, frame):
     print('Остановка бота...')
     sys.exit(0)
@@ -73,6 +75,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Состояния для ConversationHandler
 (
     MAIN_MENU,
     CITY_SELECTED,
@@ -178,6 +181,7 @@ def save_to_google_sheets(registration: Dict[str, Any]):
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
 async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Проверяет, не истек ли таймаут сессии (для iOS)"""
     last_action = context.user_data.get("last_action", 0)
     current_time = datetime.now().timestamp()
     
@@ -191,6 +195,7 @@ async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TY
     return False
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает главное меню (работает и с message, и с callback_query)"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -249,9 +254,11 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
     return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик всех кнопок"""
     query = update.callback_query
     await query.answer()
     
@@ -352,6 +359,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await show_main_menu(update, context)
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает меню для выбранного города"""
     query = update.callback_query
     selected_game = context.user_data.get("selected_game")
     
@@ -398,7 +406,13 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
+async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Не используется - для совместимости"""
+    await update.callback_query.message.reply_text("Для этой игры нет акции.")
+    return CITY_SELECTED
+
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода названия команды"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -419,6 +433,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода количества игроков"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -459,6 +474,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ответа про легионера"""
     query = update.callback_query
     await query.answer()
     
@@ -473,6 +489,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода данных капитана"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -542,6 +559,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода вопроса"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -578,11 +596,13 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
     return await show_main_menu(update, context)
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Принудительный сброс состояния бота"""
     context.user_data.clear()
     await update.message.reply_text("🔄 Состояние бота сброшено. Нажмите /start")
     return await show_main_menu(update, context)
@@ -605,35 +625,45 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    CallbackQueryHandler(game_selected),
                 ],
             },
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
+                CallbackQueryHandler(game_selected),
             ],
         )
 
