@@ -2,11 +2,9 @@ import json
 import logging
 import os
 import sys
-import time
 import base64
 import gspread
 import signal
-from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
@@ -20,9 +18,24 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from flask import Flask
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-SESSION_TIMEOUT = 300
+# Простой HTTP сервер для health check
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+    
+    def log_message(self, format, *args):
+        pass
+
+def run_health_server():
+    try:
+        server = HTTPServer(('0.0.0.0', 10000), HealthHandler)
+        server.serve_forever()
+    except:
+        pass
 
 def signal_handler(sig, frame):
     print('Остановка бота...')
@@ -30,18 +43,6 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
-
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "OK"
-
-def run_web():
-    try:
-        app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
-    except:
-        pass
 
 if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
@@ -159,7 +160,8 @@ def load_data() -> Dict[str, Any]:
         default_data = {
             "games": ["Москва 11.04", "Казань 11.03", "Краснодар 14.03"], 
             "promo_registrations": [],
-            "users": {}
+            "users": {},
+            "registrations": []
         }
         save_data(default_data)
         return default_data
@@ -168,7 +170,7 @@ def load_data() -> Dict[str, Any]:
             return json.load(f)
     except Exception as e:
         logger.error(f"Ошибка загрузки данных: {e}")
-        return {"games": [], "promo_registrations": [], "users": {}}
+        return {"games": [], "promo_registrations": [], "users": {}, "registrations": []}
 
 def save_data(data: Dict[str, Any]):
     try:
@@ -212,7 +214,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     
     context.user_data.clear()
-    context.user_data["last_action"] = datetime.now().timestamp()
     
     welcome_text = (
         "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
@@ -242,7 +243,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
-    context.user_data["last_action"] = datetime.now().timestamp()
     
     if callback_data.startswith("game_"):
         try:
@@ -454,12 +454,24 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
 
 def main():
-    # Запускаем Flask
-    Thread(target=run_web, daemon=True).start()
-    time.sleep(1)
+    # Запускаем простой HTTP сервер
+    import threading
+    server_thread = threading.Thread(target=run_health_server, daemon=True)
+    server_thread.start()
     
-    # Запускаем бота
+    # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Очищаем вебхук
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(application.bot.delete_webhook(drop_pending_updates=True))
+        print("✅ Вебхук очищен")
+    except Exception as e:
+        print(f"Ошибка очистки: {e}")
+    loop.close()
     
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -482,8 +494,9 @@ def main():
     print(f"👑 Админы: {get_registration_admin_ids()}")
     print("=" * 50)
     
-    # Запускаем без event loop проблем
+    # Запускаем бота
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
+    
