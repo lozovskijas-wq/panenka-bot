@@ -270,6 +270,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if callback_data == "start_over":
         return await show_main_menu(update, context)
     
+    # Главное меню - выбор города
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -295,15 +296,18 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
+    # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         return await show_main_menu(update, context)
     
+    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await show_main_menu(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
+    # Кнопка "Помощь"
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
@@ -323,6 +327,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
+    # Кнопка обновления (для iOS)
     elif callback_data == "refresh":
         await query.message.reply_text(
             "🔄 Состояние обновлено. Попробуйте снова.",
@@ -332,14 +337,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
+    # Кнопка "Заявить команду" из меню после выбора города
     elif callback_data == "start_registration":
-        city_name = context.user_data.get("selected_game", "")
-        city_part = city_name.split()[0] if city_name else ""
-        logger.info(f"Начало регистрации для города: {city_part}")
-        
         await query.message.reply_text("Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇")
         return REGISTER_TEAM
     
+    # Кнопки для легионера
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
@@ -350,6 +353,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
+    # Кнопка "Заявить команду" (альтернативный callback)
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
@@ -407,7 +411,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Не используется - для совместимости"""
     await update.callback_query.message.reply_text("Для этой игры нет акции.")
     return CITY_SELECTED
 
@@ -621,7 +624,7 @@ def main():
                     CallbackQueryHandler(game_selected),
                 ],
                 CITY_SELECTED: [
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # Добавлен обработчик кнопок!
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
