@@ -85,6 +85,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     action = query.data
     logger.info(f"Нажата кнопка: {action}")
+    logger.info(f"Данные пользователя до обработки: {context.user_data}")
     
     if action == "city_moscow":
         text = """📍 Москва – 11 апреля (суббота)
@@ -123,6 +124,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.message.reply_photo(photo, caption=text, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        context.user_data.clear()
     
     elif action == "help":
         context.user_data['help_mode'] = True
@@ -158,19 +160,28 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif action == "register":
+        context.user_data.clear()
         context.user_data['step'] = 'team'
+        context.user_data['registration_data'] = {}
+        logger.info(f"Начало регистрации, user_data: {context.user_data}")
         await query.message.reply_text("Введите название команды 👇")
     
     elif action == "legioner_yes":
-        logger.info("Кнопка ДА нажата, сохраняем легионера")
-        context.user_data['legioner'] = "Да"
+        logger.info(f"Кнопка ДА нажата, текущие данные: {context.user_data}")
+        if 'registration_data' not in context.user_data:
+            context.user_data['registration_data'] = {}
+        context.user_data['registration_data']['legioner'] = "Да"
         context.user_data['step'] = 'captain'
+        logger.info(f"После сохранения: {context.user_data}")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
     
     elif action == "legioner_no":
-        logger.info("Кнопка НЕТ нажата, сохраняем легионера")
-        context.user_data['legioner'] = "Нет"
+        logger.info(f"Кнопка НЕТ нажата, текущие данные: {context.user_data}")
+        if 'registration_data' not in context.user_data:
+            context.user_data['registration_data'] = {}
+        context.user_data['registration_data']['legioner'] = "Нет"
         context.user_data['step'] = 'captain'
+        logger.info(f"После сохранения: {context.user_data}")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,7 +189,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text.strip()
     
-    logger.info(f"Сообщение от {user.id}: '{text}', step={context.user_data.get('step')}")
+    logger.info(f"Сообщение от {user.id}: '{text}'")
+    logger.info(f"user_data: {context.user_data}")
+    logger.info(f"step: {context.user_data.get('step')}")
     
     # Режим помощи
     if context.user_data.get('help_mode'):
@@ -191,13 +204,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Режим регистрации
     step = context.user_data.get('step')
     
+    # Если нет активного шага - показываем главное меню
+    if not step:
+        text = "Выберите город:"
+        keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # Получаем или создаем данные регистрации
+    if 'registration_data' not in context.user_data:
+        context.user_data['registration_data'] = {}
+    
+    reg_data = context.user_data['registration_data']
+    
     # Шаг 1: Название команды
     if step == 'team':
         if not text:
             await update.message.reply_text("Введите название команды:")
             return
-        context.user_data['team'] = text
+        if len(text) > 50:
+            await update.message.reply_text("Название слишком длинное (до 50 символов):")
+            return
+        
+        reg_data['team'] = text
         context.user_data['step'] = 'players'
+        logger.info(f"Шаг team завершен, переходим к players. reg_data: {reg_data}")
         await update.message.reply_text("Сколько игроков? (от 3 до 10)")
         return
     
@@ -210,8 +241,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if count < 3 or count > 10:
             await update.message.reply_text("От 3 до 10 игроков. Введите число:")
             return
-        context.user_data['players'] = text
+        
+        reg_data['players'] = text
         context.user_data['step'] = 'legioner'
+        logger.info(f"Шаг players завершен, переходим к legioner. reg_data: {reg_data}")
         
         keyboard = [
             [InlineKeyboardButton("✅ Да", callback_data="legioner_yes")],
@@ -224,14 +257,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if step == 'captain':
         logger.info(f"Шаг captain: получен текст '{text}'")
         
+        if not text:
+            await update.message.reply_text("Пожалуйста, введите данные капитана:")
+            return
+        
         # Сохраняем всё, что ввел пользователь
-        context.user_data['captain'] = text
+        reg_data['captain'] = text
         
         # Формируем регистрацию
         registration = {
-            'team': context.user_data.get('team', ''),
-            'players': context.user_data.get('players', ''),
-            'legioner': context.user_data.get('legioner', 'Не указано'),
+            'team': reg_data.get('team', ''),
+            'players': reg_data.get('players', ''),
+            'legioner': reg_data.get('legioner', 'Не указано'),
             'captain': text,
             'user_id': user.id,
             'user_name': user.full_name,
@@ -264,13 +301,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Очищаем данные
         context.user_data.clear()
+        logger.info("Регистрация завершена, данные очищены")
         return
-    
-    # Если нет активного шага - показываем главное меню
-    if not step:
-        text = "Выберите город:"
-        keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
-        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
