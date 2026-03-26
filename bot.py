@@ -40,8 +40,8 @@ def home():
 
 def run_web():
     try:
-        app.run(host='0.0.0.0', port=10000, debug=False)
-    except:
+        app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
+    except Exception as e:
         pass
 
 if sys.version_info >= (3, 12):
@@ -203,8 +203,6 @@ def save_to_google_sheets(registration: Dict[str, Any]):
             ]
             sheet.append_row(row)
             logger.info(f"✅ Данные сохранены в Google Sheets")
-        else:
-            logger.warning(f"Файл credentials.json не найден")
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
@@ -556,18 +554,21 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
 
 def main():
-    # Запускаем Flask в отдельном потоке с обработкой ошибки порта
+    # Запускаем Flask в отдельном потоке
     try:
-        Thread(target=run_web, daemon=True).start()
+        flask_thread = Thread(target=run_web, daemon=True)
+        flask_thread.start()
+        time.sleep(1)
         logger.info("🌐 Веб-сервер запущен на порту 10000")
     except Exception as e:
         logger.warning(f"Не удалось запустить веб-сервер: {e}")
 
     # Очистка вебхука
     try:
+        import asyncio
+        from telegram import Bot
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        from telegram import Bot
         bot = Bot(token=BOT_TOKEN)
         loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
         print("✅ Вебхук очищен")
@@ -575,30 +576,19 @@ def main():
     except Exception as e:
         print(f"Ошибка очистки: {e}")
 
+    # Запуск бота
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
-                MAIN_MENU: [
-                    CallbackQueryHandler(game_selected),
-                ],
-                CITY_SELECTED: [
-                    CallbackQueryHandler(game_selected),
-                ],
-                REGISTER_TEAM: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                ],
-                REGISTER_PLAYERS: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                ],
-                REGISTER_LEGIONER: [
-                    CallbackQueryHandler(legioner_received),
-                ],
-                REGISTER_CAPTAIN: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                ],
+                MAIN_MENU: [CallbackQueryHandler(game_selected)],
+                CITY_SELECTED: [CallbackQueryHandler(game_selected)],
+                REGISTER_TEAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)],
+                REGISTER_PLAYERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)],
+                REGISTER_LEGIONER: [CallbackQueryHandler(legioner_received)],
+                REGISTER_CAPTAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                     CallbackQueryHandler(game_selected),
@@ -608,6 +598,7 @@ def main():
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
             ],
+            per_message=False,
         )
 
         application.add_handler(conv_handler)
@@ -616,6 +607,7 @@ def main():
         print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
         print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
         
+        # Запускаем polling
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
             timeout=30,
@@ -625,12 +617,6 @@ def main():
     except Exception as e:
         logger.error(f"Критическая ошибка: {e}")
         time.sleep(5)
-        os.execl(sys.executable, sys.executable, *sys.argv)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Критическая ошибка: {e}")
-        time.sleep(5)
-        os.execl(sys.executable, sys.executable, *sys.argv)
+    main()
