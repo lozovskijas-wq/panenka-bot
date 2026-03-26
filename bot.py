@@ -4,15 +4,14 @@ import os
 import sys
 import time
 import base64
-import requests
-import gspread
 import asyncio
+import gspread
 import signal
 from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Bot
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -23,6 +22,21 @@ from telegram.ext import (
     ContextTypes,
 )
 from flask import Flask
+
+# Очистка вебхука при запуске
+async def cleanup():
+    try:
+        bot = Bot(token=os.environ.get('BOT_TOKEN'))
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Вебхук очищен")
+    except Exception as e:
+        print(f"Ошибка очистки: {e}")
+
+# Запускаем очистку
+try:
+    asyncio.run(cleanup())
+except:
+    pass
 
 SESSION_TIMEOUT = 300
 
@@ -194,11 +208,10 @@ def save_to_google_sheets(registration: Dict[str, Any]):
                 now.strftime("%H:%M"),
                 registration.get('selected_game', ''),
                 registration.get('team_name', ''),
-                registration.get('captain_info', '').split(',')[0] if registration.get('captain_info') else '',
-                registration.get('captain_info', '').split(',')[-1] if registration.get('captain_info') else '',
-                str(registration.get('user_id', '')),
+                registration.get('captain_info', ''),
                 registration.get('player_count', ''),
-                registration.get('legioner', '')
+                registration.get('legioner', ''),
+                str(registration.get('user_id', ''))
             ]
             sheet.append_row(row)
             logger.info(f"✅ Данные сохранены в Google Sheets")
@@ -462,7 +475,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
     game_info = GAME_INFO.get(selected_game, {})
-    city_name = selected_game.split()[0] if selected_game else ""
 
     registration = {
         "user_id": user.id,
@@ -561,6 +573,10 @@ def main():
 
     try:
         application = Application.builder().token(BOT_TOKEN).build()
+
+        # Добавляем отдельные обработчики команд
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
