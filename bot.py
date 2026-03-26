@@ -2,9 +2,11 @@ import json
 import logging
 import os
 import sys
+import time
 import base64
 import gspread
 import signal
+from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
@@ -18,24 +20,9 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask
 
-# Простой HTTP сервер для health check
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-    
-    def log_message(self, format, *args):
-        pass
-
-def run_health_server():
-    try:
-        server = HTTPServer(('0.0.0.0', 10000), HealthHandler)
-        server.serve_forever()
-    except:
-        pass
+SESSION_TIMEOUT = 300
 
 def signal_handler(sig, frame):
     print('Остановка бота...')
@@ -43,6 +30,15 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "OK"
+
+def run_web():
+    app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
 
 if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
@@ -454,24 +450,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
 
 def main():
-    # Запускаем простой HTTP сервер
-    import threading
-    server_thread = threading.Thread(target=run_health_server, daemon=True)
-    server_thread.start()
+    # Запускаем Flask
+    Thread(target=run_web, daemon=True).start()
+    time.sleep(1)
     
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
-    
-    # Очищаем вебхук
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(application.bot.delete_webhook(drop_pending_updates=True))
-        print("✅ Вебхук очищен")
-    except Exception as e:
-        print(f"Ошибка очистки: {e}")
-    loop.close()
     
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -499,4 +483,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
