@@ -4,7 +4,6 @@ import os
 import sys
 import time
 import base64
-import asyncio
 import gspread
 import signal
 from threading import Thread
@@ -41,7 +40,7 @@ def home():
 def run_web():
     try:
         app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
-    except Exception as e:
+    except:
         pass
 
 if sys.version_info >= (3, 12):
@@ -54,9 +53,9 @@ if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
         creds_json = base64.b64decode(creds_base64).decode('utf-8')
         with open('credentials.json', 'w') as f:
             f.write(creds_json)
-        print("✅ credentials.json восстановлен из переменной окружения")
+        print("✅ credentials.json восстановлен")
     except Exception as e:
-        print(f"❌ Ошибка восстановления credentials.json: {e}")
+        print(f"❌ Ошибка: {e}")
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_IDS_STR = os.environ.get('ADMIN_ID', '')
@@ -158,11 +157,7 @@ DATA_FILE = "data.json"
 def load_data() -> Dict[str, Any]:
     if not os.path.exists(DATA_FILE):
         default_data = {
-            "games": [
-                "Москва 11.04",
-                "Казань 11.03",
-                "Краснодар 14.03"
-            ], 
+            "games": ["Москва 11.04", "Казань 11.03", "Краснодар 14.03"], 
             "promo_registrations": [],
             "users": {}
         }
@@ -202,12 +197,11 @@ def save_to_google_sheets(registration: Dict[str, Any]):
                 str(registration.get('user_id', ''))
             ]
             sheet.append_row(row)
-            logger.info(f"✅ Данные сохранены в Google Sheets")
+            logger.info(f"✅ Сохранено в Google Sheets")
     except Exception as e:
-        logger.error(f"Ошибка сохранения в Google Sheets: {e}")
+        logger.error(f"Ошибка Google Sheets: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -237,27 +231,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=welcome_text,
-                reply_markup=reply_markup
-            )
+            await update.message.reply_photo(photo, caption=welcome_text, reply_markup=reply_markup)
     else:
-        await update.message.reply_text(
-            text=welcome_text,
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text(text=welcome_text, reply_markup=reply_markup)
     
     return MAIN_MENU
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик всех кнопок"""
     query = update.callback_query
     await query.answer()
-    
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
-    
     context.user_data["last_action"] = datetime.now().timestamp()
     
     if callback_data.startswith("game_"):
@@ -273,15 +257,13 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return MAIN_MENU
                 
                 context.user_data["selected_game"] = selected_game
-                logger.info(f"Выбран город: {selected_game}")
-                
                 await show_city_menu(update, context)
                 return CITY_SELECTED
             else:
                 await query.edit_message_text("Ошибка: игра не найдена")
                 return MAIN_MENU
         except Exception as e:
-            logger.error(f"Ошибка выбора игры: {e}")
+            logger.error(f"Ошибка: {e}")
             await query.edit_message_text("Ошибка при выборе города")
             return MAIN_MENU
     
@@ -298,42 +280,25 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CITY_SELECTED
     
     elif callback_data == "help":
-        help_text = (
-            "❓ Есть вопрос?\n\n"
-            "Напишите его сюда @Panenka_Registration — поможем разобраться."
-        )
-        keyboard = [
-            [InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]
-        ]
-        await query.edit_message_text(
-            help_text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        help_text = "❓ Есть вопрос?\n\nНапишите его сюда @Panenka_Registration — поможем разобраться."
+        keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
+        await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(keyboard))
         return HELP_MESSAGE
     
     elif callback_data == "start_registration":
-        await query.edit_message_text(
-            f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
-        )
+        await query.edit_message_text("Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇")
         return REGISTER_TEAM
     
     elif callback_data in ["legioner_yes", "legioner_no"]:
-        legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
-        context.user_data["legioner"] = legioner_answer
-        logger.info(f"Легионер: {legioner_answer}")
-        
-        await query.edit_message_text(
-            text="Напишите имя и номер телефона капитана 👇"
-        )
+        context.user_data["legioner"] = "Да" if callback_data == "legioner_yes" else "Нет"
+        await query.edit_message_text("Напишите имя и номер телефона капитана 👇")
         return REGISTER_CAPTAIN
     
     else:
-        logger.warning(f"Неизвестная кнопка: {callback_data}")
         await start(update, context)
         return MAIN_MENU
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает меню для выбранного города"""
     query = update.callback_query
     selected_game = context.user_data.get("selected_game")
     
@@ -359,29 +324,20 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
-        [
-            InlineKeyboardButton("❓ Помощь", callback_data="help"),
-            InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")
-        ]
+        [InlineKeyboardButton("❓ Помощь", callback_data="help"), InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if os.path.exists(photo_file):
         with open(photo_file, 'rb') as photo:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=menu_text),
-                reply_markup=reply_markup
-            )
+            await query.edit_message_media(media=InputMediaPhoto(media=photo, caption=menu_text), reply_markup=reply_markup)
     else:
-        await query.edit_message_text(
-            text=menu_text,
-            reply_markup=reply_markup
-        )
+        await query.edit_message_text(text=menu_text, reply_markup=reply_markup)
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.startswith('/'):
-        await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
+        await update.message.reply_text("Пожалуйста, введите название команды.")
         return REGISTER_TEAM
     
     team_name = update.message.text.strip()
@@ -390,20 +346,17 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return REGISTER_TEAM
     
     context.user_data["team_name"] = team_name
-    context.user_data["last_action"] = datetime.now().timestamp()
-    logger.info(f"Название команды: {team_name}")
-    
     await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.startswith('/'):
-        await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
+        await update.message.reply_text("Пожалуйста, введите количество игроков.")
         return REGISTER_PLAYERS
     
     player_count = update.message.text.strip()
     if not player_count:
-        await update.message.reply_text("Количество игроков не может быть пустым. Введите число от 3 до 10:")
+        await update.message.reply_text("Введите число от 3 до 10:")
         return REGISTER_PLAYERS
     
     if not player_count.isdigit():
@@ -416,40 +369,21 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         return REGISTER_PLAYERS
     
     context.user_data["player_count"] = player_count
-    context.user_data["last_action"] = datetime.now().timestamp()
-    logger.info(f"Количество игроков: {player_count}")
     
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Да", callback_data="legioner_yes"),
-            InlineKeyboardButton("❌ Нет", callback_data="legioner_no")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        "Готовы ли взять в команду «легионера» (человека без команды)?",
-        reply_markup=reply_markup
-    )
+    keyboard = [[InlineKeyboardButton("✅ Да", callback_data="legioner_yes"), InlineKeyboardButton("❌ Нет", callback_data="legioner_no")]]
+    await update.message.reply_text("Готовы ли взять в команду «легионера» (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
     return REGISTER_LEGIONER
 
 async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
-    context.user_data["legioner"] = legioner_answer
-    context.user_data["last_action"] = datetime.now().timestamp()
-    logger.info(f"Легионер: {legioner_answer}")
-    
-    await query.edit_message_text(
-        text="Напишите имя и номер телефона капитана 👇"
-    )
+    context.user_data["legioner"] = "Да" if query.data == "legioner_yes" else "Нет"
+    await query.edit_message_text("Напишите имя и номер телефона капитана 👇")
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.startswith('/'):
-        await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
+        await update.message.reply_text("Пожалуйста, введите данные капитана.")
         return REGISTER_CAPTAIN
     
     captain_info = update.message.text.strip()
@@ -479,39 +413,18 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         data["registrations"] = []
     data["registrations"].append(registration)
     save_data(data)
-    logger.info(f"Новая регистрация: {registration}")
-
     save_to_google_sheets(registration)
 
-    venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
-    
-    final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_prepositional}\n\nМы свяжемся с капитаном при необходимости."
-    keyboard = [
-        [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
-    ]
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(final_message, reply_markup=reply_markup)
+    final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в баре «Золотая Вобла»\n\nМы свяжемся с капитаном при необходимости."
+    keyboard = [[InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]]
+    await update.message.reply_text(final_message, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    registration_admin_ids = get_registration_admin_ids()
-    admin_message = (
-        f"🔔 Новая регистрация!\n"
-        f"Игра: {selected_game}\n"
-        f"Команда: {team_name}\n"
-        f"Игроков: {context.user_data.get('player_count')}\n"
-        f"Легионер: {context.user_data.get('legioner', 'Не указано')}\n"
-        f"Капитан: {captain_info}\n"
-        f"От: {user.full_name} (@{user.username})"
-    )
-    
-    for admin_id in registration_admin_ids:
+    admin_message = f"🔔 Новая регистрация!\nИгра: {selected_game}\nКоманда: {team_name}\nИгроков: {context.user_data.get('player_count')}\nЛегионер: {context.user_data.get('legioner', 'Не указано')}\nКапитан: {captain_info}\nОт: {user.full_name} (@{user.username})"
+    for admin_id in get_registration_admin_ids():
         try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=admin_message
-            )
+            await context.bot.send_message(chat_id=admin_id, text=admin_message)
         except Exception as e:
-            logger.error(f"Ошибка отправки админу {admin_id}: {e}")
+            logger.error(f"Ошибка: {e}")
 
     return MAIN_MENU
 
@@ -523,28 +436,15 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     help_text = update.message.text.strip()
     user = update.effective_user
     
-    await update.message.reply_text(
-        "✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
-        ]])
-    )
+    await update.message.reply_text("✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.", 
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]))
 
-    help_admin_ids = get_help_admin_ids()
-    for admin_id in help_admin_ids:
+    for admin_id in get_help_admin_ids():
         try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"❓ Вопрос от пользователя\n"
-                     f"ID: {user.id}\n"
-                     f"Имя: {user.full_name}\n"
-                     f"Username: @{user.username}\n"
-                     f"------------------------\n"
-                     f"{help_text}"
-            )
-            logger.info(f"Вопрос отправлен админу {admin_id}")
+            await context.bot.send_message(chat_id=admin_id, 
+                text=f"❓ Вопрос от пользователя\nID: {user.id}\nИмя: {user.full_name}\nUsername: @{user.username}\n------------------------\n{help_text}")
         except Exception as e:
-            logger.error(f"Ошибка отправки вопроса админу {admin_id}: {e}")
+            logger.error(f"Ошибка: {e}")
     
     return MAIN_MENU
 
@@ -554,69 +454,36 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
 
 def main():
-    # Запускаем Flask в отдельном потоке
-    try:
-        flask_thread = Thread(target=run_web, daemon=True)
-        flask_thread.start()
-        time.sleep(1)
-        logger.info("🌐 Веб-сервер запущен на порту 10000")
-    except Exception as e:
-        logger.warning(f"Не удалось запустить веб-сервер: {e}")
-
-    # Очистка вебхука
-    try:
-        import asyncio
-        from telegram import Bot
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        bot = Bot(token=BOT_TOKEN)
-        loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
-        print("✅ Вебхук очищен")
-        loop.close()
-    except Exception as e:
-        print(f"Ошибка очистки: {e}")
-
-    # Запуск бота
-    try:
-        application = Application.builder().token(BOT_TOKEN).build()
-
-        conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("start", start)],
-            states={
-                MAIN_MENU: [CallbackQueryHandler(game_selected)],
-                CITY_SELECTED: [CallbackQueryHandler(game_selected)],
-                REGISTER_TEAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)],
-                REGISTER_PLAYERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)],
-                REGISTER_LEGIONER: [CallbackQueryHandler(legioner_received)],
-                REGISTER_CAPTAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)],
-                HELP_MESSAGE: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),
-                ],
-            },
-            fallbacks=[
-                CommandHandler("cancel", cancel),
-                CommandHandler("start", start),
-            ],
-            per_message=False,
-        )
-
-        application.add_handler(conv_handler)
-
-        print("✅ Бот запущен!")
-        print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
-        print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
-        
-        # Запускаем polling
-        application.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            timeout=30,
-            drop_pending_updates=True,
-            poll_interval=1.0
-        )
-    except Exception as e:
-        logger.error(f"Критическая ошибка: {e}")
-        time.sleep(5)
+    # Запускаем Flask
+    Thread(target=run_web, daemon=True).start()
+    time.sleep(1)
+    
+    # Запускаем бота
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            MAIN_MENU: [CallbackQueryHandler(game_selected)],
+            CITY_SELECTED: [CallbackQueryHandler(game_selected)],
+            REGISTER_TEAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received)],
+            REGISTER_PLAYERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received)],
+            REGISTER_LEGIONER: [CallbackQueryHandler(legioner_received)],
+            REGISTER_CAPTAIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received)],
+            HELP_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received), CallbackQueryHandler(game_selected)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel), CommandHandler("start", start)],
+    )
+    
+    application.add_handler(conv_handler)
+    
+    print("=" * 50)
+    print("✅ БОТ ЗАПУЩЕН!")
+    print(f"👑 Админы: {get_registration_admin_ids()}")
+    print("=" * 50)
+    
+    # Запускаем без event loop проблем
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
