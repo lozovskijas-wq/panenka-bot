@@ -12,7 +12,7 @@ from threading import Thread
 from datetime import datetime
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -206,8 +206,8 @@ def save_to_google_sheets(registration: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
+async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет главное меню с выбором города"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -237,18 +237,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=welcome_text,
+            if update.callback_query:
+                await update.callback_query.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+    else:
+        if update.callback_query:
+            await update.callback_query.message.reply_text(
+                text=welcome_text,
                 reply_markup=reply_markup
             )
-    else:
-        await update.message.reply_text(
-            text=welcome_text,
-            reply_markup=reply_markup
-        )
+        else:
+            await update.message.reply_text(
+                text=welcome_text,
+                reply_markup=reply_markup
+            )
     
     return MAIN_MENU
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
+    return await send_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик всех кнопок"""
@@ -270,7 +287,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selected_game = games[game_index]
                 
                 if not GAME_INFO.get(selected_game, {}).get("active", False):
-                    await query.edit_message_text("Эта игра уже недоступна для регистрации.")
+                    await query.message.reply_text("Эта игра уже недоступна для регистрации.")
                     return MAIN_MENU
                 
                 context.user_data["selected_game"] = selected_game
@@ -279,24 +296,21 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_city_menu(update, context)
                 return CITY_SELECTED
             else:
-                await query.edit_message_text("Ошибка: игра не найдена")
+                await query.message.reply_text("Ошибка: игра не найдена")
                 return MAIN_MENU
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
-            await query.edit_message_text("Ошибка при выборе города")
+            await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
     # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
-        context.user_data.clear()
-        await start(update, context)
-        return MAIN_MENU
+        return await send_main_menu(update, context)
     
     # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
-            await start(update, context)
-            return MAIN_MENU
+            return await send_main_menu(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
@@ -309,7 +323,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]
         ]
-        await query.edit_message_text(
+        await query.message.reply_text(
             help_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -317,7 +331,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка "Заявить команду"
     elif callback_data == "start_registration":
-        await query.edit_message_text(
+        await query.message.reply_text(
             f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
         )
         return REGISTER_TEAM
@@ -328,15 +342,14 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["legioner"] = legioner_answer
         logger.info(f"Легионер: {legioner_answer}")
         
-        await query.edit_message_text(
+        await query.message.reply_text(
             text="Напишите имя и номер телефона капитана 👇"
         )
         return REGISTER_CAPTAIN
     
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
-        await start(update, context)
-        return MAIN_MENU
+        return await send_main_menu(update, context)
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
@@ -344,7 +357,7 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected_game = context.user_data.get("selected_game")
     
     if not selected_game:
-        await query.edit_message_text("Ошибка: город не выбран")
+        await query.message.reply_text("Ошибка: город не выбран")
         return MAIN_MENU
     
     game_info = GAME_INFO.get(selected_game, {})
@@ -375,12 +388,13 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists(photo_file):
         with open(photo_file, 'rb') as photo:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=photo, caption=menu_text),
+            await query.message.reply_photo(
+                photo=photo,
+                caption=menu_text,
                 reply_markup=reply_markup
             )
     else:
-        await query.edit_message_text(
+        await query.message.reply_text(
             text=menu_text,
             reply_markup=reply_markup
         )
@@ -451,7 +465,7 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Легионер: {legioner_answer}")
     
-    await query.edit_message_text(
+    await query.message.reply_text(
         text="Напишите имя и номер телефона капитана 👇"
     )
     return REGISTER_CAPTAIN
@@ -562,7 +576,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
-    return await start(update, context)
+    return await send_main_menu(update, context)
 
 def main():
     Thread(target=run_web, daemon=True).start()
