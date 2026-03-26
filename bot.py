@@ -256,7 +256,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await send_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик выбора города"""
+    """Обработчик всех кнопок"""
     query = update.callback_query
     await query.answer()
     
@@ -323,6 +323,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["legioner"] = legioner_answer
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
         return REGISTER_CAPTAIN
+    
+    # Обработка кнопки отмены в любом состоянии
+    elif callback_data == "cancel_action":
+        context.user_data.clear()
+        return await send_main_menu(update, context)
     
     return MAIN_MENU
 
@@ -559,27 +564,28 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
+                    CallbackQueryHandler(game_selected),  # Для кнопок "Назад" и др.
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
+                    CallbackQueryHandler(game_selected),  # Для кнопок "Назад" и др.
                 ],
                 REGISTER_LEGIONER: [
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # Для кнопок "Да"/"Нет" и "Назад"
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
+                    CallbackQueryHandler(game_selected),  # Для кнопок "Назад" и др.
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),  # Добавлено для кнопок
+                    CallbackQueryHandler(game_selected),  # Для кнопки "Назад"
                 ],
             },
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
+                CallbackQueryHandler(game_selected),  # Для обработки кнопок в fallback
             ],
         )
 
