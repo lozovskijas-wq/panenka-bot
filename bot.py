@@ -70,7 +70,7 @@ async def save_to_google_sheets(reg):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Старт бота"""
     context.user_data.clear()
-    text = "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\nВыберите город:"
+    text = "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\nВыберите город и дату 👇"
     keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
     
     if os.path.exists('logo.jpg'):
@@ -85,7 +85,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     action = query.data
     logger.info(f"Нажата кнопка: {action}")
-    logger.info(f"Данные пользователя до обработки: {context.user_data}")
     
     if action == "city_moscow":
         text = """📍 Москва – 11 апреля (суббота)
@@ -97,7 +96,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ⚽️ Старт игры – 16:20
 
 💰 Стоимость участия:
-800₽ – в джерси любого клуба или сборной
+800₽ – в джерси любого клуба или сборной,
 1 000₽ – в обычной одежде
 
 Если команда уже заявлена другим способом – повторная регистрация не нужна.
@@ -106,7 +105,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register")],
-            [InlineKeyboardButton("❓ Помощь", callback_data="help"), InlineKeyboardButton("🔙 Назад", callback_data="back")]
+            [
+                InlineKeyboardButton("❓ Помощь", callback_data="help"),
+                InlineKeyboardButton("🔙 Назад", callback_data="back")
+            ]
         ]
         
         if os.path.exists('photo1.jpg'):
@@ -116,7 +118,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif action == "back":
-        text = "Выберите город:"
+        text = "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\nВыберите город и дату 👇"
         keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
         
         if os.path.exists('logo.jpg'):
@@ -129,7 +131,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "help":
         context.user_data['help_mode'] = True
         keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
-        await query.message.reply_text("❓ Напишите ваш вопрос:", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.reply_text(
+            "❓ Есть вопрос?\n\nНапишите его сюда и мы ответим в ближайшее время.\n\nВаш вопрос:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     
     elif action == "back_to_city":
         text = """📍 Москва – 11 апреля (суббота)
@@ -141,7 +146,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ⚽️ Старт игры – 16:20
 
 💰 Стоимость участия:
-800₽ – в джерси любого клуба или сборной
+800₽ – в джерси любого клуба или сборной,
 1 000₽ – в обычной одежде
 
 Если команда уже заявлена другим способом – повторная регистрация не нужна.
@@ -150,7 +155,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register")],
-            [InlineKeyboardButton("❓ Помощь", callback_data="help"), InlineKeyboardButton("🔙 Назад", callback_data="back")]
+            [
+                InlineKeyboardButton("❓ Помощь", callback_data="help"),
+                InlineKeyboardButton("🔙 Назад", callback_data="back")
+            ]
         ]
         
         if os.path.exists('photo1.jpg'):
@@ -163,25 +171,22 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         context.user_data['step'] = 'team'
         context.user_data['registration_data'] = {}
-        logger.info(f"Начало регистрации, user_data: {context.user_data}")
-        await query.message.reply_text("Введите название команды 👇")
+        await query.message.reply_text(
+            "Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
+        )
     
     elif action == "legioner_yes":
-        logger.info(f"Кнопка ДА нажата, текущие данные: {context.user_data}")
         if 'registration_data' not in context.user_data:
             context.user_data['registration_data'] = {}
         context.user_data['registration_data']['legioner'] = "Да"
         context.user_data['step'] = 'captain'
-        logger.info(f"После сохранения: {context.user_data}")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
     
     elif action == "legioner_no":
-        logger.info(f"Кнопка НЕТ нажата, текущие данные: {context.user_data}")
         if 'registration_data' not in context.user_data:
             context.user_data['registration_data'] = {}
         context.user_data['registration_data']['legioner'] = "Нет"
         context.user_data['step'] = 'captain'
-        logger.info(f"После сохранения: {context.user_data}")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -189,15 +194,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text.strip()
     
-    logger.info(f"Сообщение от {user.id}: '{text}'")
-    logger.info(f"user_data: {context.user_data}")
-    logger.info(f"step: {context.user_data.get('step')}")
+    logger.info(f"Сообщение от {user.id}: '{text}', step={context.user_data.get('step')}")
     
     # Режим помощи
     if context.user_data.get('help_mode'):
         msg = f"❓ Вопрос от {user.full_name} (@{user.username})\n\n{text}"
         await context.bot.send_message(chat_id=HELP_ADMIN_ID, text=msg)
-        await update.message.reply_text("✅ Вопрос отправлен! Мы ответим в ближайшее время.")
+        await update.message.reply_text(
+            "✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 В главное меню", callback_data="back")
+            ]])
+        )
         context.user_data.pop('help_mode', None)
         return
     
@@ -206,7 +214,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Если нет активного шага - показываем главное меню
     if not step:
-        text = "Выберите город:"
+        text = "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\nВыберите город и дату 👇"
         keyboard = [[InlineKeyboardButton("Москва 11.04", callback_data="city_moscow")]]
         await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
@@ -220,45 +228,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Шаг 1: Название команды
     if step == 'team':
         if not text:
-            await update.message.reply_text("Введите название команды:")
-            return
-        if len(text) > 50:
-            await update.message.reply_text("Название слишком длинное (до 50 символов):")
+            await update.message.reply_text("Введите название команды 👇")
             return
         
         reg_data['team'] = text
         context.user_data['step'] = 'players'
-        logger.info(f"Шаг team завершен, переходим к players. reg_data: {reg_data}")
-        await update.message.reply_text("Сколько игроков? (от 3 до 10)")
+        await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
         return
     
     # Шаг 2: Количество игроков
     if step == 'players':
         if not text.isdigit():
-            await update.message.reply_text("Введите число от 3 до 10:")
+            await update.message.reply_text("Пожалуйста, введите число (от 3 до 10):")
             return
         count = int(text)
         if count < 3 or count > 10:
-            await update.message.reply_text("От 3 до 10 игроков. Введите число:")
+            await update.message.reply_text("Количество игроков должно быть от 3 до 10. Введите число:")
             return
         
         reg_data['players'] = text
         context.user_data['step'] = 'legioner'
-        logger.info(f"Шаг players завершен, переходим к legioner. reg_data: {reg_data}")
         
         keyboard = [
-            [InlineKeyboardButton("✅ Да", callback_data="legioner_yes")],
-            [InlineKeyboardButton("❌ Нет", callback_data="legioner_no")]
+            [
+                InlineKeyboardButton("✅ Да", callback_data="legioner_yes"),
+                InlineKeyboardButton("❌ Нет", callback_data="legioner_no")
+            ]
         ]
-        await update.message.reply_text("Готовы взять легионера (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(
+            "Готовы ли взять в команду «легионера» (человека без команды)?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return
     
     # Шаг 3: Данные капитана (принимаем ЛЮБОЙ текст)
     if step == 'captain':
-        logger.info(f"Шаг captain: получен текст '{text}'")
-        
         if not text:
-            await update.message.reply_text("Пожалуйста, введите данные капитана:")
+            await update.message.reply_text("Напишите имя и номер телефона капитана 👇")
             return
         
         # Сохраняем всё, что ввел пользователь
@@ -275,8 +281,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
-        logger.info(f"Сохраняем регистрацию: {registration}")
-        
         # Сохраняем в JSON
         data = load_data()
         data['registrations'].append(registration)
@@ -290,9 +294,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for admin_id in ADMIN_IDS:
             try:
                 await context.bot.send_message(chat_id=admin_id, text=admin_msg)
-                logger.info(f"Уведомление отправлено админу {admin_id}")
-            except Exception as e:
-                logger.error(f"Ошибка отправки админу {admin_id}: {e}")
+            except:
+                pass
         
         # Ответ пользователю
         result = f"✅ Команда зарегистрирована!\n\n🏆 {registration['team']}\n👥 {registration['players']} игроков\n🌟 Легионер: {registration['legioner']}\n👨‍💼 Капитан: {registration['captain']}\n\nЖдем вас!"
@@ -301,12 +304,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Очищаем данные
         context.user_data.clear()
-        logger.info("Регистрация завершена, данные очищены")
         return
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("⛔️ Доступ запрещен")
+        await update.message.reply_text("⛔️ У вас нет доступа к этой команде")
         return
     data = load_data()
     count = len(data.get('registrations', []))
@@ -314,7 +316,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text("❌ Отменено")
+    await update.message.reply_text("❌ Действие отменено")
     await start(update, context)
 
 # ============ ЗАПУСК ============
