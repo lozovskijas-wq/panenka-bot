@@ -38,6 +38,7 @@ if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
     creds_json = base64.b64decode(os.environ.get('GOOGLE_CREDENTIALS_BASE64')).decode('utf-8')
     with open('credentials.json', 'w') as f:
         f.write(creds_json)
+    print("✅ credentials.json восстановлен")
 
 DATA_FILE = "data.json"
 
@@ -51,7 +52,20 @@ def save_data(data):
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ============ ОСНОВНЫЕ ФУНКЦИИ ============
+async def save_to_google_sheets(reg):
+    try:
+        from oauth2client.service_account import ServiceAccountCredentials
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+        row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reg['team'], reg['players'], reg['legioner'], reg['captain'], reg['user_name']]
+        sheet.append_row(row)
+        logger.info("✅ Сохранено в Google Sheets")
+    except Exception as e:
+        logger.error(f"Ошибка Google Sheets: {e}")
+
+# ============ ОБРАБОТЧИКИ ============
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Старт бота"""
@@ -70,6 +84,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     action = query.data
+    logger.info(f"Нажата кнопка: {action}")
     
     if action == "city_moscow":
         text = """📍 Москва – 11 апреля (суббота)
@@ -82,7 +97,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 💰 Стоимость участия:
 800₽ – в джерси любого клуба или сборной
-1 000₽ – в обычной одежде"""
+1 000₽ – в обычной одежде
+
+Если команда уже заявлена другим способом – повторная регистрация не нужна.
+
+Если команда ещё не заявлена – сейчас самое время это сделать."""
         
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register")],
@@ -121,7 +140,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 💰 Стоимость участия:
 800₽ – в джерси любого клуба или сборной
-1 000₽ – в обычной одежде"""
+1 000₽ – в обычной одежде
+
+Если команда уже заявлена другим способом – повторная регистрация не нужна.
+
+Если команда ещё не заявлена – сейчас самое время это сделать."""
         
         keyboard = [
             [InlineKeyboardButton("📄 Заявить команду", callback_data="register")],
@@ -157,7 +180,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('help_mode'):
         msg = f"❓ Вопрос от {user.full_name} (@{user.username})\n\n{text}"
         await context.bot.send_message(chat_id=HELP_ADMIN_ID, text=msg)
-        await update.message.reply_text("✅ Вопрос отправлен!")
+        await update.message.reply_text("✅ Вопрос отправлен! Мы ответим в ближайшее время.")
         context.user_data.pop('help_mode', None)
         return
     
@@ -190,7 +213,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("✅ Да", callback_data="legioner_yes")],
             [InlineKeyboardButton("❌ Нет", callback_data="legioner_no")]
         ]
-        await update.message.reply_text("Готовы взять легионера?", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text("Готовы взять легионера (человека без команды)?", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
     # Шаг 3: Данные капитана (принимаем ЛЮБОЙ текст)
@@ -215,16 +238,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data(data)
         
         # Сохраняем в Google Sheets
-        try:
-            from oauth2client.service_account import ServiceAccountCredentials
-            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-            creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-            client = gspread.authorize(creds)
-            sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-            row = [registration['date'], registration['team'], registration['players'], registration['legioner'], registration['captain'], registration['user_name']]
-            sheet.append_row(row)
-        except Exception as e:
-            logger.error(f"Ошибка Google Sheets: {e}")
+        await save_to_google_sheets(registration)
         
         # Уведомление админам
         admin_msg = f"🔔 НОВАЯ РЕГИСТРАЦИЯ!\n\nКоманда: {registration['team']}\nИгроков: {registration['players']}\nЛегионер: {registration['legioner']}\nКапитан: {registration['captain']}\nОт: {user.full_name}"
@@ -255,7 +269,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     data = load_data()
     count = len(data.get('registrations', []))
-    await update.message.reply_text(f"📊 Всего команд: {count}")
+    await update.message.reply_text(f"📊 Всего зарегистрировано команд: {count}")
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -265,7 +279,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ============ ЗАПУСК ============
 
 def main():
-    # Запускаем Flask
+    # Запускаем Flask в отдельном потоке
     Thread(target=run_flask, daemon=True).start()
     
     # Создаем приложение
@@ -282,7 +296,7 @@ def main():
     print("✅ БОТ ЗАПУЩЕН!")
     print("=" * 50)
     
-    # Запускаем
+    # Запускаем бота с очисткой
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
