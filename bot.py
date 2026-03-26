@@ -91,6 +91,8 @@ logger = logging.getLogger(__name__)
 ) = range(11)
 
 PHOTO_MOSCOW = "photo1.jpg"
+PHOTO_KAZAN = "photo2.jpg"
+PHOTO_KRASNODAR = "photo3.jpg"
 
 GAME_INFO = {
     "Москва 11.04": {
@@ -107,6 +109,40 @@ GAME_INFO = {
         "photo": PHOTO_MOSCOW,
         "has_promo": False,
         "active": True
+    },
+    "Казань 11.03": {
+        "full_date": "11 марта (среда)",
+        "venue_short": "Ресторан MAXIMILIAN'S",
+        "venue_full": "ул. Спартаковская, 6",
+        "time_open": "19:00",
+        "time_start": "19:30",
+        "price_jersey": "700₽",
+        "price_regular": "900₽",
+        "promo_period": "с 24 февраля по 10 марта",
+        "promo_deadline": "10 марта",
+        "city": "Казани",
+        "city_prepositional": "Казани",
+        "venue_prepositional": "Ресторане MAXIMILIAN'S",
+        "photo": PHOTO_KAZAN,
+        "has_promo": True,
+        "active": False
+    },
+    "Краснодар 14.03": {
+        "full_date": "14 марта (суббота)",
+        "venue_short": "Бар NAMESTI",
+        "venue_full": "ул. Красноармейская, 55/2",
+        "time_open": "17:00",
+        "time_start": "17:30",
+        "price_jersey": "700₽",
+        "price_regular": "900₽",
+        "promo_period": "с 24 февраля по 13 марта",
+        "promo_deadline": "13 марта",
+        "city": "Краснодаре",
+        "city_prepositional": "Краснодаре",
+        "venue_prepositional": "баре NAMESTI",
+        "photo": PHOTO_KRASNODAR,
+        "has_promo": True,
+        "active": False
     }
 }
 
@@ -134,7 +170,11 @@ DATA_FILE = "data.json"
 def load_data() -> Dict[str, Any]:
     if not os.path.exists(DATA_FILE):
         default_data = {
-            "games": ["Москва 11.04"], 
+            "games": [
+                "Москва 11.04",
+                "Казань 11.03",
+                "Краснодар 14.03"
+            ], 
             "promo_registrations": [],
             "users": {}
         }
@@ -145,7 +185,7 @@ def load_data() -> Dict[str, Any]:
             return json.load(f)
     except Exception as e:
         logger.error(f"Ошибка загрузки данных: {e}")
-        return {"games": ["Москва 11.04"], "promo_registrations": [], "users": {}}
+        return {"games": [], "promo_registrations": [], "users": {}}
 
 def save_data(data: Dict[str, Any]):
     try:
@@ -217,34 +257,50 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     games = load_data().get("games", [])
     keyboard = []
     
+    # Показываем только активные игры (только Москва 11.04)
     for i, game in enumerate(games):
         if GAME_INFO.get(game, {}).get("active", False):
             keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    if update.callback_query:
-        message = update.callback_query.message
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
+    # Определяем откуда пришел вызов и отправляем сообщение
+    try:
+        if update.callback_query:
+            message = update.callback_query.message
+            if os.path.exists('logo.jpg'):
+                with open('logo.jpg', 'rb') as photo:
+                    await message.reply_photo(
+                        photo=photo,
+                        caption=welcome_text,
+                        reply_markup=reply_markup
+                    )
+            else:
+                await message.reply_text(
+                    text=welcome_text,
                     reply_markup=reply_markup
                 )
         else:
-            await message.reply_text(
+            if os.path.exists('logo.jpg'):
+                with open('logo.jpg', 'rb') as photo:
+                    await update.message.reply_photo(
+                        photo=photo,
+                        caption=welcome_text,
+                        reply_markup=reply_markup
+                    )
+            else:
+                await update.message.reply_text(
+                    text=welcome_text,
+                    reply_markup=reply_markup
+                )
+    except Exception as e:
+        logger.error(f"Ошибка отправки главного меню: {e}")
+        # Если ошибка, пробуем отправить просто текст
+        if update.callback_query:
+            await update.callback_query.message.reply_text(
                 text=welcome_text,
                 reply_markup=reply_markup
             )
-    else:
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
         else:
             await update.message.reply_text(
                 text=welcome_text,
@@ -265,11 +321,14 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
     
+    # Сохраняем время последнего действия
     context.user_data["last_action"] = datetime.now().timestamp()
     
+    # Специальный callback для перезапуска после сбоя
     if callback_data == "start_over":
         return await show_main_menu(update, context)
     
+    # Главное меню - выбор города
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -295,15 +354,18 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
+    # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         return await show_main_menu(update, context)
     
+    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await show_main_menu(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
+    # Кнопка "Помощь"
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
@@ -323,6 +385,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
+    # Кнопка обновления (для iOS)
     elif callback_data == "refresh":
         await query.message.reply_text(
             "🔄 Состояние обновлено. Попробуйте снова.",
@@ -332,14 +395,20 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
+    # Кнопка "Заявить команду" из меню после выбора города
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         city_part = city_name.split()[0] if city_name else ""
         logger.info(f"Начало регистрации для города: {city_part}")
         
-        await query.message.reply_text("Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇")
+        welcome_texts = {
+            "Москва": f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
+        }
+        
+        await query.message.reply_text(welcome_texts.get(city_part, "Введите название команды 👇"))
         return REGISTER_TEAM
     
+    # Кнопки для легионера
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
@@ -350,10 +419,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
+    # Кнопка "Заявить команду" (альтернативный callback)
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
     
+    # Если кнопка не распознана
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
         return await show_main_menu(update, context)
@@ -370,6 +441,7 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game_info = GAME_INFO.get(selected_game, {})
     photo_file = game_info.get('photo')
     
+    # Москва 11.04 (без акции)
     menu_text = (
         f"📍 Москва – 11 апреля (суббота)\n\n"
         f"🏟️ {game_info['venue_short']}\n"
@@ -407,8 +479,9 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Не используется - для совместимости"""
-    await update.callback_query.message.reply_text("Для этой игры нет акции.")
+    """Показывает условия акции (не используется для Москвы)"""
+    query = update.callback_query
+    await query.message.reply_text("Акция не проводится для этой игры.")
     return CITY_SELECTED
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -506,6 +579,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
     game_info = GAME_INFO.get(selected_game, {})
+    city_name = selected_game.split()[0] if selected_game else ""
 
     registration = {
         "user_id": user.id,
@@ -556,6 +630,26 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception as e:
             logger.error(f"Ошибка отправки админу {admin_id}: {e}")
 
+    return MAIN_MENU
+
+async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода названия команды для акции (не используется)"""
+    await update.message.reply_text("Акция не проводится для этой игры.")
+    return MAIN_MENU
+
+async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода ID клиента (не используется)"""
+    await update.message.reply_text("Акция не проводится для этой игры.")
+    return MAIN_MENU
+
+async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода номера пари (не используется)"""
+    await update.message.reply_text("Акция не проводится для этой игры.")
+    return MAIN_MENU
+
+async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ввода телефона (не используется)"""
+    await update.message.reply_text("Акция не проводится для этой игры.")
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -640,19 +734,19 @@ def main():
                     CallbackQueryHandler(game_selected),
                 ],
                 PROMO_TEAM: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 PROMO_CLIENT_ID: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 PROMO_BET_NUMBER: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 PROMO_PHONE: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 HELP_MESSAGE: [
