@@ -9,7 +9,7 @@ import gspread
 import asyncio
 import signal
 from threading import Thread
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
@@ -24,7 +24,9 @@ from telegram.ext import (
 )
 from flask import Flask
 
+# Константы
 SESSION_TIMEOUT = 300
+REGISTER_CONFIRM = 7  # Добавляем новое состояние для подтверждения
 
 def signal_handler(sig, frame):
     print('Остановка бота...')
@@ -46,6 +48,7 @@ if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
     sys.exit(1)
 
+# Восстановление credentials.json из переменной окружения
 if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
     try:
         creds_base64 = os.environ.get('GOOGLE_CREDENTIALS_BASE64')
@@ -56,6 +59,7 @@ if os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
     except Exception as e:
         print(f"❌ Ошибка восстановления credentials.json: {e}")
 
+# Переменные окружения
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_IDS_STR = os.environ.get('ADMIN_ID', '')
 SPECIFIC_ADMIN_ID = 286355827
@@ -73,6 +77,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Состояния диалога
 (
     MAIN_MENU,
     CITY_SELECTED,
@@ -81,11 +86,27 @@ logger = logging.getLogger(__name__)
     REGISTER_LEGIONER,
     REGISTER_CAPTAIN,
     HELP_MESSAGE,
-) = range(7)
+    REGISTER_CONFIRM,  # Новое состояние
+) = range(8)
 
+# Фотографии
 PHOTO_MOSCOW = "photo1.jpg"
 PHOTO_KAZAN = "photo2.jpg"
 PHOTO_KRASNODAR = "photo3.jpg"
+
+# Кэш для информации об играх
+class GameInfoCache:
+    _cache = {}
+    
+    @classmethod
+    def get(cls, game_key):
+        if game_key not in cls._cache:
+            cls._cache[game_key] = GAME_INFO.get(game_key, {})
+        return cls._cache[game_key]
+    
+    @classmethod
+    def clear(cls):
+        cls._cache.clear()
 
 GAME_INFO = {
     "Москва 11.04": {
@@ -162,7 +183,8 @@ def load_data() -> Dict[str, Any]:
                 "Краснодар 14.03"
             ], 
             "promo_registrations": [],
-            "users": {}
+            "users": {},
+            "registrations": []
         }
         save_data(default_data)
         return default_data
@@ -171,7 +193,7 @@ def load_data() -> Dict[str, Any]:
             return json.load(f)
     except Exception as e:
         logger.error(f"Ошибка загрузки данных: {e}")
-        return {"games": [], "promo_registrations": [], "users": {}}
+        return {"games": [], "promo_registrations": [], "users": {}, "registrations": []}
 
 def save_data(data: Dict[str, Any]):
     try:
@@ -180,34 +202,90 @@ def save_data(data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
 
-def save_to_google_sheets(registration: Dict[str, Any]):
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_file = "credentials.json"
-        if os.path.exists(creds_file):
-            creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
-            client = gspread.authorize(creds)
-            sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-            now = datetime.now()
-            row = [
-                now.strftime("%Y-%m-%d"),
-                now.strftime("%H:%M"),
-                registration.get('selected_game', ''),
-                registration.get('team_name', ''),
-                registration.get('name', ''),
-                registration.get('phone', ''),
-                registration.get('client_id', ''),
-                registration.get('bet_number', '')
-            ]
-            sheet.append_row(row)
-            logger.info(f"✅ Данные сохранены в Google Sheets")
-        else:
-            logger.warning(f"Файл credentials.json не найден")
-    except Exception as e:
-        logger.error(f"Ошибка сохранения в Google Sheets: {e}")
+async def save_to_google_sheets_async(registration: Dict[str, Any], retry=3):
+    """Асинхронное сохранение с повторными попытками"""
+    for attempt in range(retry):
+        try:
+            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            creds_file = "credentials.json"
+            if os.path.exists(creds_file):
+                creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+                client = gspread.authorize(creds)
+                sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+                now = datetime.now()
+                row = [
+                    now.strftime("%Y-%m-%d"),
+                    now.strftime("%H:%M"),
+                    registration.get('selected_game', ''),
+                    registration.get('team_name', ''),
+                    registration.get('name', ''),
+                    registration.get('phone', ''),
+                    registration.get('client_id', ''),
+                    registration.get('bet_number', ''),
+                    registration.get('player_count', ''),
+                    registration.get('legioner', ''),
+                    registration.get('captain_info', '')
+                ]
+                sheet.append_row(row)
+                logger.info(f"✅ Данные сохранены в Google Sheets")
+                
+                # Удаляем credentials.json после использования
+                if os.path.exists('credentials.json') and os.environ.get('GOOGLE_CREDENTIALS_BASE64'):
+                    os.remove('credentials.json')
+                    logger.info("🧹 credentials.json удален")
+                break
+            else:
+                logger.warning(f"Файл credentials.json не найден")
+                break
+        except Exception as e:
+            logger.error(f"Попытка {attempt+1} сохранения в Google Sheets не удалась: {e}")
+            if attempt == retry-1:
+                logger.error("❌ Не удалось сохранить в Google Sheets")
+            await asyncio.sleep(2)
 
-async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет главное меню с выбором города"""
+async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Проверяет, не истекло ли время сессии"""
+    last_action = context.user_data.get("last_action", 0)
+    if last_action and datetime.now().timestamp() - last_action > SESSION_TIMEOUT:
+        context.user_data.clear()
+        message = "⏰ Сессия истекла из-за неактивности. Начните заново с /start"
+        
+        if update.callback_query:
+            await update.callback_query.edit_message_text(message)
+        elif update.message:
+            await update.message.reply_text(message)
+        
+        return True
+    return False
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает статистику регистраций для админов"""
+    user_id = update.effective_user.id
+    if user_id not in get_registration_admin_ids():
+        await update.message.reply_text("⛔️ У вас нет доступа к этой команде")
+        return
+    
+    data = load_data()
+    registrations = data.get("registrations", [])
+    
+    stats = "📊 Статистика регистраций:\n\n"
+    total_teams = 0
+    
+    for game in data.get("games", []):
+        count = len([r for r in registrations if r.get("selected_game") == game])
+        if count > 0:
+            stats += f"🏆 {game}: {count} команд\n"
+            total_teams += count
+    
+    stats += f"\n📈 Всего команд: {total_teams}"
+    
+    if total_teams == 0:
+        stats += "\n\nПока нет регистраций"
+    
+    await update.message.reply_text(stats)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -237,38 +315,25 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            if update.callback_query:
-                await update.callback_query.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-            else:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
+            await update.message.reply_photo(
+                photo=photo,
+                caption=welcome_text,
+                reply_markup=reply_markup
+            )
     else:
-        if update.callback_query:
-            await update.callback_query.message.reply_text(
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
-        else:
-            await update.message.reply_text(
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
+        await update.message.reply_text(
+            text=welcome_text,
+            reply_markup=reply_markup
+        )
     
     return MAIN_MENU
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
-    return await send_main_menu(update, context)
-
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик всех кнопок"""
+    # Проверка таймаута сессии
+    if await check_session_timeout(update, context):
+        return MAIN_MENU
+    
     query = update.callback_query
     await query.answer()
     
@@ -277,7 +342,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # Выбор города из главного меню
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -287,7 +351,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 selected_game = games[game_index]
                 
                 if not GAME_INFO.get(selected_game, {}).get("active", False):
-                    await query.message.reply_text("Эта игра уже недоступна для регистрации.")
+                    await query.edit_message_text("Эта игра уже недоступна для регистрации.")
                     return MAIN_MENU
                 
                 context.user_data["selected_game"] = selected_game
@@ -296,60 +360,71 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_city_menu(update, context)
                 return CITY_SELECTED
             else:
-                await query.message.reply_text("Ошибка: игра не найдена")
+                await query.edit_message_text("Ошибка: игра не найдена")
                 return MAIN_MENU
         except Exception as e:
             logger.error(f"Ошибка выбора игры: {e}")
-            await query.message.reply_text("Ошибка при выборе города")
+            await query.edit_message_text("Ошибка при выборе города")
             return MAIN_MENU
     
-    # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
-        return await send_main_menu(update, context)
+        context.user_data.clear()
+        await start(update, context)
+        return MAIN_MENU
     
-    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
-            return await send_main_menu(update, context)
+            await start(update, context)
+            return MAIN_MENU
         await show_city_menu(update, context)
         return CITY_SELECTED
     
-    # Кнопка "Помощь"
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
-            "Напишите его сюда @Panenka_Registration — поможем разобраться."
+            "Напишите его сюда и мы ответим в ближайшее время.\n\n"
+            "Ваш вопрос:"
         )
         keyboard = [
             [InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]
         ]
-        await query.message.reply_text(
+        await query.edit_message_text(
             help_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return HELP_MESSAGE
     
-    # Кнопка "Заявить команду"
     elif callback_data == "start_registration":
-        await query.message.reply_text(
+        await query.edit_message_text(
             f"Отлично! ✌🏻\n\nДавайте зарегистрируем команду на игру в Москве — 11 апреля.\n\nВведите название команды 👇"
         )
         return REGISTER_TEAM
     
-    # Кнопки для легионера
+    elif callback_data == "confirm_registration":
+        # Подтверждение регистрации
+        return await save_registration(update, context)
+    
+    elif callback_data == "edit_registration":
+        # Редактирование - начинаем заново
+        await query.edit_message_text(
+            "Давайте начнем регистрацию заново.\n\nВведите название команды 👇"
+        )
+        return REGISTER_TEAM
+    
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
         logger.info(f"Легионер: {legioner_answer}")
         
-        await query.message.reply_text(
-            text="Напишите имя и номер телефона капитана 👇"
+        await query.edit_message_text(
+            text="Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
         )
         return REGISTER_CAPTAIN
     
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
-        return await send_main_menu(update, context)
+        await start(update, context)
+        return MAIN_MENU
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
@@ -357,10 +432,10 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected_game = context.user_data.get("selected_game")
     
     if not selected_game:
-        await query.message.reply_text("Ошибка: город не выбран")
+        await query.edit_message_text("Ошибка: город не выбран")
         return MAIN_MENU
     
-    game_info = GAME_INFO.get(selected_game, {})
+    game_info = GameInfoCache.get(selected_game)
     photo_file = game_info.get('photo')
     
     menu_text = (
@@ -388,19 +463,22 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists(photo_file):
         with open(photo_file, 'rb') as photo:
-            await query.message.reply_photo(
-                photo=photo,
-                caption=menu_text,
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=photo, caption=menu_text),
                 reply_markup=reply_markup
             )
     else:
-        await query.message.reply_text(
+        await query.edit_message_text(
             text=menu_text,
             reply_markup=reply_markup
         )
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода названия команды"""
+    """Обработчик названия команды"""
+    # Проверка таймаута
+    if await check_session_timeout(update, context):
+        return ConversationHandler.END
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return REGISTER_TEAM
@@ -408,6 +486,10 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     team_name = update.message.text.strip()
     if not team_name:
         await update.message.reply_text("Название команды не может быть пустым. Введите название 👇")
+        return REGISTER_TEAM
+    
+    if len(team_name) > 50:
+        await update.message.reply_text("Название команды слишком длинное (максимум 50 символов). Введите название 👇")
         return REGISTER_TEAM
     
     context.user_data["team_name"] = team_name
@@ -418,7 +500,11 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода количества игроков"""
+    """Обработчик количества игроков"""
+    # Проверка таймаута
+    if await check_session_timeout(update, context):
+        return ConversationHandler.END
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return REGISTER_PLAYERS
@@ -456,7 +542,11 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ответа про легионера"""
+    """Обработчик выбора легионера"""
+    # Проверка таймаута
+    if await check_session_timeout(update, context):
+        return ConversationHandler.END
+    
     query = update.callback_query
     await query.answer()
     
@@ -465,13 +555,17 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Легионер: {legioner_answer}")
     
-    await query.message.reply_text(
-        text="Напишите имя и номер телефона капитана 👇"
+    await query.edit_message_text(
+        text="Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
     )
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода данных капитана"""
+    """Обработчик информации о капитане"""
+    # Проверка таймаута
+    if await check_session_timeout(update, context):
+        return ConversationHandler.END
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -481,10 +575,43 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Данные капитана не могут быть пустыми. Введите имя и телефон 👇")
         return REGISTER_CAPTAIN
     
+    if len(captain_info) > 100:
+        await update.message.reply_text("Данные капитана слишком длинные. Введите имя и телефон короче 👇")
+        return REGISTER_CAPTAIN
+    
+    context.user_data["captain_info"] = captain_info
+    context.user_data["last_action"] = datetime.now().timestamp()
+    
+    # Показываем сводку для подтверждения
+    summary = (
+        f"📋 Проверьте данные регистрации:\n\n"
+        f"🏆 Команда: {context.user_data['team_name']}\n"
+        f"👥 Количество игроков: {context.user_data['player_count']}\n"
+        f"🌟 Легионер: {context.user_data.get('legioner', 'Не указано')}\n"
+        f"👨‍💼 Капитан: {captain_info}\n\n"
+        f"✅ Всё верно?"
+    )
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Да, всё верно", callback_data="confirm_registration"),
+            InlineKeyboardButton("✏️ Заполнить заново", callback_data="edit_registration")
+        ]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(summary, reply_markup=reply_markup)
+    return REGISTER_CONFIRM
+
+async def save_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Сохраняет регистрацию после подтверждения"""
+    query = update.callback_query
+    await query.answer()
+    
     user = update.effective_user
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
-    game_info = GAME_INFO.get(selected_game, {})
+    game_info = GameInfoCache.get(selected_game)
     city_name = selected_game.split()[0] if selected_game else ""
 
     registration = {
@@ -495,10 +622,12 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         "team_name": team_name,
         "player_count": context.user_data.get("player_count"),
         "legioner": context.user_data.get("legioner", "Не указано"),
-        "captain_info": captain_info,
-        "date": str(update.message.date)
+        "captain_info": context.user_data.get("captain_info"),
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "registration_time": datetime.now().timestamp()
     }
 
+    # Сохраняем в JSON
     data = load_data()
     if "registrations" not in data:
         data["registrations"] = []
@@ -506,25 +635,37 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     save_data(data)
     logger.info(f"Новая регистрация: {registration}")
 
+    # Сохраняем в Google Sheets асинхронно
+    asyncio.create_task(save_to_google_sheets_async(registration))
+
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
-    final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_prepositional}\n\nМы свяжемся с капитаном при необходимости."
+    final_message = (
+        f"✅ Команда зарегистрирована!\n\n"
+        f"Ждем вас в субботу в {venue_prepositional}\n\n"
+        f"📌 Если у вас возникнут вопросы, нажмите кнопку «Помощь»\n\n"
+        f"Мы свяжемся с капитаном при необходимости."
+    )
+    
     keyboard = [
         [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(final_message, reply_markup=reply_markup)
+    await query.edit_message_text(final_message, reply_markup=reply_markup)
 
+    # Отправляем уведомление администраторам
     registration_admin_ids = get_registration_admin_ids()
     admin_message = (
-        f"🔔 Новая регистрация!\n"
-        f"Игра: {selected_game}\n"
-        f"Команда: {team_name}\n"
-        f"Игроков: {context.user_data.get('player_count')}\n"
-        f"Легионер: {context.user_data.get('legioner', 'Не указано')}\n"
-        f"Капитан: {captain_info}\n"
-        f"От: {user.full_name} (@{user.username})"
+        f"🔔 Новая регистрация!\n\n"
+        f"🎮 Игра: {selected_game}\n"
+        f"🏆 Команда: {team_name}\n"
+        f"👥 Игроков: {context.user_data.get('player_count')}\n"
+        f"🌟 Легионер: {context.user_data.get('legioner', 'Не указано')}\n"
+        f"👨‍💼 Капитан: {context.user_data.get('captain_info')}\n"
+        f"👤 От: {user.full_name}\n"
+        f"🆔 Username: @{user.username}\n"
+        f"🕐 Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
     
     for admin_id in registration_admin_ids:
@@ -533,38 +674,55 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
                 chat_id=admin_id,
                 text=admin_message
             )
+            logger.info(f"Уведомление отправлено админу {admin_id}")
         except Exception as e:
             logger.error(f"Ошибка отправки админу {admin_id}: {e}")
 
+    # Очищаем данные пользователя
+    context.user_data.clear()
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода вопроса"""
+    """Обработчик сообщения с вопросом"""
+    # Проверка таймаута
+    if await check_session_timeout(update, context):
+        return ConversationHandler.END
+    
     if update.message.text.startswith('/'):
-        await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
+        await update.message.reply_text("Пожалуйста, напишите ваш вопрос текстом.")
         return HELP_MESSAGE
     
     help_text = update.message.text.strip()
+    if not help_text:
+        await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
+        return HELP_MESSAGE
+    
     user = update.effective_user
     
     await update.message.reply_text(
-        "✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.",
+        "✅ Ваш вопрос отправлен! Мы ответим в ближайшее время.\n\n"
+        "Вы можете продолжить пользоваться ботом, нажав кнопку «Назад»",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
         ]])
     )
 
     help_admin_ids = get_help_admin_ids()
+    admin_message = (
+        f"❓ Новый вопрос от пользователя\n\n"
+        f"🆔 ID: {user.id}\n"
+        f"👤 Имя: {user.full_name}\n"
+        f"📱 Username: @{user.username}\n"
+        f"🎮 Игра: {context.user_data.get('selected_game', 'Не выбрана')}\n"
+        f"------------------------\n"
+        f"💬 Вопрос:\n{help_text}"
+    )
+    
     for admin_id in help_admin_ids:
         try:
             await context.bot.send_message(
                 chat_id=admin_id,
-                text=f"❓ Вопрос от пользователя\n"
-                     f"ID: {user.id}\n"
-                     f"Имя: {user.full_name}\n"
-                     f"Username: @{user.username}\n"
-                     f"------------------------\n"
-                     f"{help_text}"
+                text=admin_message
             )
             logger.info(f"Вопрос отправлен админу {admin_id}")
         except Exception as e:
@@ -573,18 +731,37 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действия"""
+    """Отмена текущего действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
-    return await send_main_menu(update, context)
+    return await start(update, context)
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /help"""
+    help_text = (
+        "🤖 Помощь по боту:\n\n"
+        "/start - начать работу с ботом\n"
+        "/cancel - отменить текущее действие\n"
+        "/stats - статистика регистраций (только для админов)\n\n"
+        "❓ Если у вас есть вопросы, нажмите кнопку «Помощь» в меню города"
+    )
+    await update.message.reply_text(help_text)
 
 def main():
+    # Запускаем веб-сервер для Render
     Thread(target=run_web, daemon=True).start()
     logger.info("🌐 Веб-сервер запущен на порту 10000")
 
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
+        # Добавляем команды
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("cancel", cancel))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("stats", stats_command))
+
+        # Основной ConversationHandler
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
@@ -606,6 +783,9 @@ def main():
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
                 ],
+                REGISTER_CONFIRM: [
+                    CallbackQueryHandler(game_selected),
+                ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                     CallbackQueryHandler(game_selected),
@@ -614,7 +794,9 @@ def main():
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
+                CommandHandler("help", help_command),
             ],
+            per_message=False,
         )
 
         application.add_handler(conv_handler)
@@ -622,6 +804,7 @@ def main():
         print("✅ Бот запущен!")
         print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
         print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
+        print(f"🕐 Таймаут сессии: {SESSION_TIMEOUT} секунд")
         
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
