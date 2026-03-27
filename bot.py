@@ -974,7 +974,6 @@ def main():
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
-                CallbackQueryHandler(game_selected),
             ],
         )
 
