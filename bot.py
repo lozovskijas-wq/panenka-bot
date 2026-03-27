@@ -252,8 +252,8 @@ async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TY
         return True
     return False
 
-async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает главное меню (работает и с message, и с callback_query)"""
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -281,40 +281,20 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Определяем откуда пришел вызов
-    if update.callback_query:
-        message = update.callback_query.message
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            await message.reply_text(
-                text=welcome_text,
+    if os.path.exists('logo.jpg'):
+        with open('logo.jpg', 'rb') as photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=welcome_text,
                 reply_markup=reply_markup
             )
     else:
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            await update.message.reply_text(
-                text=welcome_text,
-                reply_markup=reply_markup
-            )
+        await update.message.reply_text(
+            text=welcome_text,
+            reply_markup=reply_markup
+        )
     
     return MAIN_MENU
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
-    return await show_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик всех кнопок"""
@@ -329,7 +309,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Специальный callback для перезапуска после сбоя
     if callback_data == "start_over":
-        return await show_main_menu(update, context)
+        return await start(update, context)
     
     # Главное меню - выбор города
     if callback_data.startswith("game_"):
@@ -359,12 +339,12 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
-        return await show_main_menu(update, context)
+        return await start(update, context)
     
     # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
-            return await show_main_menu(update, context)
+            return await start(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
@@ -490,7 +470,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Если кнопка не распознана
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
-        return await show_main_menu(update, context)
+        return await start(update, context)
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
@@ -505,7 +485,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo_file = game_info.get('photo')
     
     if selected_game == "Москва 11.04":
-        # Новая Москва - с новым текстом и без акции
         menu_text = (
             f"📍 Москва – 11 апреля (суббота)\n\n"
             f"🏟 {game_info['venue_short']}\n"
@@ -527,7 +506,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     
     elif selected_game == "Москва 28.02":
-        # Старая Москва - без акции
         menu_text = (
             f"📍 Москва – 28 февраля (суббота)\n\n"
             f"🏟️ {game_info['venue_short']}\n"
@@ -549,7 +527,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     
     elif selected_game == "Казань 11.03" and game_info.get('has_promo', False):
-        # Для Казани - с акцией
         menu_text = (
             f"📍 Казань – 11 марта (среда)\n\n"
             f"🏟️ {game_info['venue_short']}\n"
@@ -573,7 +550,7 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
         ]
     
-    else:  # Краснодар (с акцией, но сейчас скрыт)
+    else:
         menu_text = (
             f"📍 Краснодар – 14 марта (суббота)\n\n"
             f"🏟️ {game_info['venue_short']}\n"
@@ -630,7 +607,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "6. Команда должна быть зарегистрирована на игру.\n"
             "7. Организатор вправе проверить корректность предоставленных данных."
         )
-    else:  # Краснодар
+    else:
         terms_text = (
             "📋 Условия участия по ставке\n\n"
             "1. Минимальная сумма пари - 700₽.\n"
@@ -1023,13 +1000,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
-    return await show_main_menu(update, context)
+    return await start(update, context)
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Принудительный сброс состояния бота"""
     context.user_data.clear()
     await update.message.reply_text("🔄 Состояние бота сброшено. Нажмите /start")
-    return await show_main_menu(update, context)
+    return await start(update, context)
 
 def main():
     Thread(target=run_web, daemon=True).start()
