@@ -461,7 +461,6 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода данных капитана"""
-    # Проверяем, не является ли сообщение командой
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -584,7 +583,7 @@ def main():
         application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
-            entry_points=[CallbackQueryHandler(game_selected)],
+            entry_points=[CommandHandler("start", start), CallbackQueryHandler(game_selected)],  # ✅ ВЕРНУЛ /start в entry_points
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
