@@ -579,11 +579,12 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
-        application.add_handler(CommandHandler("start", start))
+        # Убираем отдельный обработчик /start, чтобы не было конфликта
+        # application.add_handler(CommandHandler("start", start))  # УБРАНО!
         application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("start", start), CallbackQueryHandler(game_selected)],  # ✅ ВЕРНУЛ /start в entry_points
+            entry_points=[CommandHandler("start", start), CallbackQueryHandler(game_selected)],
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
