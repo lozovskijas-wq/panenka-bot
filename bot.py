@@ -251,7 +251,8 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start - полностью сбрасывает состояние"""
+    """Обработчик команды /start - полностью сбрасывает состояние и показывает главное меню"""
+    logger.info(f"Команда /start от пользователя {update.effective_user.id}")
     context.user_data.clear()
     return await send_main_menu(update, context)
 
@@ -266,8 +267,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Обработка кнопки "Назад в главное меню"
     if callback_data == "back_to_main":
         context.user_data.clear()
-        await send_main_menu(update, context)
-        return MAIN_MENU
+        return await send_main_menu(update, context)
     
     # Обработка кнопки "Назад к выбору города"
     elif callback_data == "back_to_city":
@@ -275,8 +275,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_city_menu(update, context)
             return CITY_SELECTED
         else:
-            await send_main_menu(update, context)
-            return MAIN_MENU
+            return await send_main_menu(update, context)
     
     # Обработка кнопки "Помощь"
     elif callback_data == "help":
@@ -329,8 +328,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Обработка кнопки отмены в любом состоянии
     elif callback_data == "cancel_action":
         context.user_data.clear()
-        await send_main_menu(update, context)
-        return MAIN_MENU
+        return await send_main_menu(update, context)
     
     return MAIN_MENU
 
@@ -556,6 +554,11 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
+        # ВАЖНО: Добавляем обработчик команды /start ДО ConversationHandler
+        # Он будет обрабатывать команду /start всегда, даже если есть активный диалог
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("cancel", cancel))
+
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
@@ -588,6 +591,7 @@ def main():
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
+                CallbackQueryHandler(game_selected),
             ],
         )
 
