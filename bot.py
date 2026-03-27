@@ -679,7 +679,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
-    # Для Москвы 11.04 - только кнопка "В главное меню"
     if selected_game == "Москва 11.04":
         final_message = (
             f"Команда зарегистрирована ✅\n\n"
@@ -950,39 +949,39 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),
+                    CallbackQueryHandler(game_selected),  # для кнопки Назад
                 ],
             },
             fallbacks=[
