@@ -579,12 +579,11 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
-        # Убираем отдельный обработчик /start, чтобы не было конфликта
-        # application.add_handler(CommandHandler("start", start))  # УБРАНО!
+        application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("start", start), CallbackQueryHandler(game_selected)],
+            entry_points=[CallbackQueryHandler(game_selected)],
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
@@ -594,15 +593,19 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
+                    # Убрали CallbackQueryHandler(game_selected) из этого состояния
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
+                    # Убрали CallbackQueryHandler(game_selected) из этого состояния
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
+                    # Убрали CallbackQueryHandler(game_selected) из этого состояния
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
