@@ -263,11 +263,13 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     return MAIN_MENU
 
-# ВАЖНО: Функция start ДОЛЖНА быть доступна ВСЕГДА
+# ВАЖНО: start должна быть доступна ВСЕГДА
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start - работает для ВСЕХ пользователей"""
     logger.info(f"Команда /start от пользователя {update.effective_user.id}")
+    # Очищаем любые данные пользователя
     context.user_data.clear()
+    # Отправляем главное меню
     return await send_main_menu(update, context)
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -585,7 +587,7 @@ def main():
         
         application = Application.builder().token(BOT_TOKEN).build()
 
-        # ВАЖНО: Добавляем обработчик /start ПЕРВЫМ, чтобы он перехватывал команду
+        # ВАЖНО: Добавляем обработчик /start ПЕРВЫМ
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("cancel", cancel))
 
