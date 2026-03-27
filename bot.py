@@ -237,16 +237,29 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=welcome_text,
+            if update.callback_query:
+                await update.callback_query.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+    else:
+        if update.callback_query:
+            await update.callback_query.message.reply_text(
+                text=welcome_text,
                 reply_markup=reply_markup
             )
-    else:
-        await update.message.reply_text(
-            text=welcome_text,
-            reply_markup=reply_markup
-        )
+        else:
+            await update.message.reply_text(
+                text=welcome_text,
+                reply_markup=reply_markup
+            )
     
     return MAIN_MENU
 
@@ -329,6 +342,14 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data == "cancel_action":
         context.user_data.clear()
         return await send_main_menu(update, context)
+    
+    # Обработка ответа от кнопки "Назад" в меню помощи
+    elif callback_data == "back_to_city_from_help":
+        if context.user_data.get("selected_game"):
+            await show_city_menu(update, context)
+            return CITY_SELECTED
+        else:
+            return await send_main_menu(update, context)
     
     return MAIN_MENU
 
@@ -554,8 +575,6 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
-        # ВАЖНО: Добавляем обработчик команды /start ДО ConversationHandler
-        # Он будет обрабатывать команду /start всегда, даже если есть активный диалог
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("cancel", cancel))
 
@@ -577,6 +596,7 @@ def main():
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_LEGIONER: [
+                    CallbackQueryHandler(legioner_received),
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
