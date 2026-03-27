@@ -263,8 +263,9 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     return MAIN_MENU
 
+# ВАЖНО: Функция start ДОЛЖНА быть доступна ВСЕГДА
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start - полностью сбрасывает состояние и показывает главное меню"""
+    """Обработчик команды /start - работает для ВСЕХ пользователей"""
     logger.info(f"Команда /start от пользователя {update.effective_user.id}")
     context.user_data.clear()
     return await send_main_menu(update, context)
@@ -335,6 +336,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
+        logger.info(f"Легионер: {legioner_answer}")
         await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
         return REGISTER_CAPTAIN
     
@@ -417,7 +419,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return REGISTER_TEAM
     
     context.user_data["team_name"] = team_name
-    logger.info(f"Название команды: {team_name}")
+    logger.info(f"✅ Название команды сохранено: {team_name}")
     
     await update.message.reply_text("Сколько игроков будет в команде? (от 3 до 10 человек)")
     return REGISTER_PLAYERS
@@ -443,7 +445,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
         return REGISTER_PLAYERS
     
     context.user_data["player_count"] = player_count
-    logger.info(f"Количество игроков: {player_count}")
+    logger.info(f"✅ Количество игроков сохранено: {player_count}")
     
     keyboard = [
         [
@@ -470,7 +472,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Данные капитана не могут быть пустыми. Введите имя и телефон 👇")
         return REGISTER_CAPTAIN
     
-    logger.info(f"Данные капитана: {captain_info}")
+    logger.info(f"✅ Данные капитана сохранены: {captain_info}")
     
     user = update.effective_user
     selected_game = context.user_data.get("selected_game", "")
@@ -496,7 +498,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         data["registrations"] = []
     data["registrations"].append(registration)
     save_data(data)
-    logger.info(f"Новая регистрация: {registration}")
+    logger.info(f"✅ Новая регистрация: {registration}")
 
     save_to_google_sheets(registration)
 
@@ -577,17 +579,17 @@ def main():
     logger.info("🌐 Веб-сервер запущен на порту 10000")
 
     try:
-        # Сначала удаляем вебхук, чтобы избежать конфликта
-        import requests
+        # Удаляем вебхук, чтобы избежать конфликта
         requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", data={"drop_pending_updates": True})
         logger.info("✅ Вебхук удален")
         
         application = Application.builder().token(BOT_TOKEN).build()
 
-        # ВАЖНО: добавляем обработчик /start ТОЛЬКО здесь, не в entry_points
+        # ВАЖНО: Добавляем обработчик /start ПЕРВЫМ, чтобы он перехватывал команду
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("cancel", cancel))
 
+        # ConversationHandler обрабатывает все остальные действия
         conv_handler = ConversationHandler(
             entry_points=[CallbackQueryHandler(game_selected)],
             states={
@@ -599,29 +601,23 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
-                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                    CallbackQueryHandler(game_selected),
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),
                 ],
             },
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
-                CallbackQueryHandler(game_selected),
             ],
         )
 
