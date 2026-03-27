@@ -300,48 +300,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # Выход в главное меню
-    if callback_data == "back_to_main":
-        return await start(update, context)
-    
-    # Назад к выбору города
-    if callback_data == "back_to_city":
-        if not context.user_data.get("selected_game"):
-            return await start(update, context)
-        await show_city_menu(update, context)
-        return CITY_SELECTED
-    
-    # Помощь
-    if callback_data == "help":
-        help_text = (
-            "❓ Есть вопрос?\n\n"
-            "Напишите его сюда @Panenka_Registration — поможем разобраться.\n\n"
-            "📱 *Проблема с кнопками на iPhone?*\n"
-            "• Отправьте любое сообщение (например, точку)\n"
-            "• Или нажмите кнопку '🔄 Обновить' ниже"
-        )
-        keyboard = [
-            [InlineKeyboardButton("🔄 Обновить", callback_data="refresh")],
-            [InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]
-        ]
-        await query.message.reply_text(
-            help_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
-        )
-        return HELP_MESSAGE
-    
-    # Обновление
-    if callback_data == "refresh":
-        await query.message.reply_text(
-            "🔄 Состояние обновлено. Попробуйте снова.",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
-            ]])
-        )
-        return CITY_SELECTED
-    
-    # Выбор города
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -367,8 +325,29 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
-    # Регистрация команды
-    if callback_data == "start_registration":
+    elif callback_data == "back_to_main":
+        return await start(update, context)
+    
+    elif callback_data == "back_to_city":
+        if not context.user_data.get("selected_game"):
+            return await start(update, context)
+        await show_city_menu(update, context)
+        return CITY_SELECTED
+    
+    elif callback_data == "help":
+        help_text = (
+            "❓ Есть вопрос?\n\n"
+            "Напишите его сюда @Panenka_Registration — поможем разобраться."
+        )
+        await query.message.reply_text(
+            help_text,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
+            ]])
+        )
+        return HELP_MESSAGE
+    
+    elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         logger.info(f"Начало регистрации для города: {city_name}")
         
@@ -383,29 +362,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         return REGISTER_TEAM
     
-    # Заявить команду (альтернативный callback)
-    if callback_data == "register_team":
-        await query.message.reply_text("Введите название команды 👇")
-        return REGISTER_TEAM
-    
-    # Легионер
-    if callback_data in ["legioner_yes", "legioner_no"]:
-        legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
-        context.user_data["legioner"] = legioner_answer
-        logger.info(f"Легионер: {legioner_answer}")
-        
-        await query.message.reply_text(
-            text="Напишите имя и номер телефона капитана 👇"
-        )
-        return REGISTER_CAPTAIN
-    
-    # Акция - Да
-    if callback_data == "promo_yes":
+    elif callback_data == "promo_yes":
         await query.message.reply_text("Из какой вы команды?")
         return PROMO_TEAM
     
-    # Акция - Нет
-    if callback_data == "promo_no":
+    elif callback_data == "promo_no":
         await query.message.reply_text(
             "Сначала необходимо зарегистрировать команду. 👇\n\n"
             "После этого вы сможете оформить участие по ставке.",
@@ -415,8 +376,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
-    # Прийти по ставке
-    if callback_data == "start_promo_registration":
+    elif callback_data == "start_promo_registration":
         promo_text = (
             "🎟️ Участие по ставке предоставляется игроку, с аккаунта которого было заключено пари\n\n"
             "Ваша команда уже зарегистрирована?"
@@ -435,18 +395,27 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(promo_text, reply_markup=reply_markup)
         return CITY_SELECTED
     
-    # Условия акции
-    if callback_data == "promo_terms":
+    elif callback_data == "promo_terms":
         await show_terms_menu(update, context)
         return CITY_SELECTED
     
-    # Перезапуск
-    if callback_data == "start_over":
-        return await start(update, context)
+    elif callback_data in ["legioner_yes", "legioner_no"]:
+        legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
+        context.user_data["legioner"] = legioner_answer
+        logger.info(f"Легионер: {legioner_answer}")
+        
+        await query.message.reply_text(
+            text="Напишите имя и номер телефона капитана 👇"
+        )
+        return REGISTER_CAPTAIN
     
-    # Если кнопка не распознана
-    logger.warning(f"Неизвестная кнопка: {callback_data}")
-    return await start(update, context)
+    elif callback_data == "register_team":
+        await query.message.reply_text("Введите название команды 👇")
+        return REGISTER_TEAM
+    
+    else:
+        logger.warning(f"Неизвестная кнопка: {callback_data}")
+        return await start(update, context)
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -481,7 +450,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")
             ]
         ]
-    
     else:
         menu_text = (
             f"📍 {selected_game}\n\n"
@@ -949,45 +917,35 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(legioner_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
-                    CallbackQueryHandler(game_selected),  # для кнопок Назад/Помощь
                 ],
                 HELP_MESSAGE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
-                    CallbackQueryHandler(game_selected),  # для кнопки Назад
                 ],
             },
             fallbacks=[
                 CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
-                CallbackQueryHandler(game_selected),
             ],
         )
 
