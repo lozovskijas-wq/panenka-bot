@@ -24,7 +24,6 @@ from telegram.ext import (
 )
 from flask import Flask
 
-# Константа для таймаута сессии (в секундах)
 SESSION_TIMEOUT = 300
 
 def signal_handler(sig, frame):
@@ -250,7 +249,6 @@ async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TY
     return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -294,7 +292,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return MAIN_MENU
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик всех кнопок"""
     query = update.callback_query
     await query.answer()
     
@@ -439,7 +436,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await start(update, context)
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает меню для выбранного города"""
     query = update.callback_query
     await query.answer()
     
@@ -510,7 +506,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает условия акции"""
     query = update.callback_query
     await query.answer()
     
@@ -558,7 +553,6 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода названия команды"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -579,7 +573,6 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода количества игроков"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -620,7 +613,6 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ответа про легионера"""
     query = update.callback_query
     await query.answer()
     
@@ -635,7 +627,6 @@ async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return REGISTER_CAPTAIN
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода данных капитана"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -675,9 +666,12 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
-    # Для Москвы 11.04 - только кнопка "В главное меню", без акции
     if selected_game == "Москва 11.04":
-        final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_prepositional}\n\nМы свяжемся с капитаном при необходимости."
+        final_message = (
+            f"Команда зарегистрирована ✅\n\n"
+            f"Ждем вас в субботу в {venue_prepositional}\n\n"
+            f"Мы свяжемся с капитаном при необходимости."
+        )
         keyboard = [
             [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
         ]
