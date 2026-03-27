@@ -25,9 +25,8 @@ from telegram.ext import (
 from flask import Flask
 
 # Константа для таймаута сессии (в секундах)
-SESSION_TIMEOUT = 300  # 5 минут
+SESSION_TIMEOUT = 300
 
-# Обработка сигналов для корректного завершения
 def signal_handler(sig, frame):
     print('Остановка бота...')
     sys.exit(0)
@@ -75,7 +74,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Состояния для ConversationHandler
 (
     MAIN_MENU,
     CITY_SELECTED,
@@ -239,7 +237,6 @@ def save_to_google_sheets(registration: Dict[str, Any]):
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
 async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Проверяет, не истек ли таймаут сессии (для iOS)"""
     last_action = context.user_data.get("last_action", 0)
     current_time = datetime.now().timestamp()
     
@@ -304,14 +301,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     callback_data = query.data
     logger.info(f"Нажата кнопка: {callback_data}")
     
-    # Сохраняем время последнего действия
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # Специальный callback для перезапуска после сбоя
     if callback_data == "start_over":
         return await start(update, context)
     
-    # Главное меню - выбор города
     if callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -337,18 +331,15 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
-    # Кнопка "Назад в главное меню"
     elif callback_data == "back_to_main":
         return await start(update, context)
     
-    # Кнопка "Назад к выбору города"
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await start(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
-    # Кнопка "Помощь"
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
@@ -368,7 +359,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
-    # Кнопка обновления (для iOS)
     elif callback_data == "refresh":
         await query.message.reply_text(
             "🔄 Состояние обновлено. Попробуйте снова.",
@@ -378,7 +368,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
-    # Кнопки акции
     elif callback_data == "promo_yes":
         await query.message.reply_text("Из какой вы команды?")
         return PROMO_TEAM
@@ -393,7 +382,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CITY_SELECTED
     
-    # Кнопка "Заявить команду" из меню после выбора города
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         logger.info(f"Начало регистрации для города: {city_name}")
@@ -404,29 +392,11 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Давайте зарегистрируем команду на игру в Москве — 11 апреля.\n\n"
                 "Введите название команды 👇"
             )
-        elif city_name == "Москва 28.02":
-            await query.message.reply_text(
-                "Отлично! ✌🏻\n\n"
-                "Давайте зарегистрируем команду на игру в Москве — 28 февраля.\n\n"
-                "Введите название команды 👇"
-            )
-        elif "Казань" in city_name:
-            await query.message.reply_text(
-                "Давайте зарегистрируем команду на игру в Казани — 11 марта.\n\n"
-                "Введите название команды 👇"
-            )
-        elif "Краснодар" in city_name:
-            await query.message.reply_text(
-                "Отлично! ✌🏻\n\n"
-                "Давайте зарегистрируем команду на игру в Краснодаре – 14 марта.\n\n"
-                "Введите название команды 👇"
-            )
         else:
             await query.message.reply_text("Введите название команды 👇")
         
         return REGISTER_TEAM
     
-    # Кнопка "Прийти по ставке"
     elif callback_data == "start_promo_registration":
         promo_text = (
             "🎟️ Участие по ставке предоставляется игроку, с аккаунта которого было заключено пари\n\n"
@@ -446,12 +416,10 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(promo_text, reply_markup=reply_markup)
         return CITY_SELECTED
     
-    # Кнопка "Условия акции"
     elif callback_data == "promo_terms":
         await show_terms_menu(update, context)
         return CITY_SELECTED
     
-    # Кнопки для легионера
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
@@ -462,12 +430,10 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
-    # Кнопка "Заявить команду" (альтернативный callback)
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
     
-    # Если кнопка не распознана
     else:
         logger.warning(f"Неизвестная кнопка: {callback_data}")
         return await start(update, context)
@@ -475,6 +441,8 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
     query = update.callback_query
+    await query.answer()
+    
     selected_game = context.user_data.get("selected_game")
     
     if not selected_game:
@@ -505,9 +473,9 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         ]
     
-    elif selected_game == "Москва 28.02":
+    else:
         menu_text = (
-            f"📍 Москва – 28 февраля (суббота)\n\n"
+            f"📍 {selected_game}\n\n"
             f"🏟️ {game_info['venue_short']}\n"
             f"📫 {game_info['venue_full']}\n\n"
             f"🕖 Двери открыты с {game_info['time_open']}\n"
@@ -524,54 +492,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("❓ Помощь", callback_data="help"),
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")
             ]
-        ]
-    
-    elif selected_game == "Казань 11.03" and game_info.get('has_promo', False):
-        menu_text = (
-            f"📍 Казань – 11 марта (среда)\n\n"
-            f"🏟️ {game_info['venue_short']}\n"
-            f"📫 {game_info['venue_full']}\n\n"
-            f"🕖 Двери открыты с {game_info['time_open']}\n"
-            f"⚽ Старт игры – {game_info['time_start']}\n\n"
-            f"💰 Стоимость участия:\n"
-            f"{game_info['price_jersey']} – в джерси любого клуба или сборной,\n"
-            f"{game_info['price_regular']} – в обычной одежде\n\n"
-            f"🎟️ Можно сделать ставку от 700₽ в FONBET и участвовать в игре бесплатно.\n\n"
-            f"Если команда уже заявлена – каждый игрок может оформить участие по ставке отдельно.\n\n"
-            f"Если команда ещё не заявлена – сейчас самое время это сделать."
-        )
-        keyboard = [
-            [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
-            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
-            [
-                InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms"),
-                InlineKeyboardButton("❓ Помощь", callback_data="help")
-            ],
-            [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
-        ]
-    
-    else:
-        menu_text = (
-            f"📍 Краснодар – 14 марта (суббота)\n\n"
-            f"🏟️ {game_info['venue_short']}\n"
-            f"📫 {game_info['venue_full']}\n\n"
-            f"🕖 Двери открыты с {game_info['time_open']}\n"
-            f"⚽ Старт игры – {game_info['time_start']}\n\n"
-            f"💰 Стоимость участия:\n"
-            f"{game_info['price_jersey']} – в джерси любого клуба или сборной,\n"
-            f"{game_info['price_regular']} – в обычной одежде\n\n"
-            f"🎟️ Можно сделать ставку от 700₽ в FONBET и участвовать в игре бесплатно.\n\n"
-            f"Если команда уже заявлена – каждый игрок может оформить участие по ставке отдельно.\n\n"
-            f"Если команда ещё не заявлена – сейчас самое время это сделать."
-        )
-        keyboard = [
-            [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
-            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
-            [
-                InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms"),
-                InlineKeyboardButton("❓ Помощь", callback_data="help")
-            ],
-            [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
         ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -592,6 +512,8 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает условия акции"""
     query = update.callback_query
+    await query.answer()
+    
     selected_game = context.user_data.get("selected_game")
     
     if selected_game == "Казань 11.03":
@@ -753,7 +675,8 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
-    if city_name == "Москва":
+    # Для Москвы 11.04 - только кнопка "В главное меню", без акции
+    if selected_game == "Москва 11.04":
         final_message = f"Команда зарегистрирована ✅ Ждем вас в субботу в {venue_prepositional}\n\nМы свяжемся с капитаном при необходимости."
         keyboard = [
             [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
@@ -799,7 +722,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода названия команды для акции"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -833,7 +755,6 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода ID клиента"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -857,7 +778,6 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return PROMO_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода номера пари"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -878,7 +798,6 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода телефона"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -960,7 +879,6 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ввода вопроса"""
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
@@ -997,13 +915,11 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     return MAIN_MENU
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действия"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
     return await start(update, context)
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Принудительный сброс состояния бота"""
     context.user_data.clear()
     await update.message.reply_text("🔄 Состояние бота сброшено. Нажмите /start")
     return await start(update, context)
