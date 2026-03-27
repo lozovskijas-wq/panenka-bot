@@ -6,7 +6,6 @@ import time
 import base64
 import requests
 import gspread
-import asyncio
 import signal
 from threading import Thread
 from datetime import datetime
@@ -24,7 +23,7 @@ from telegram.ext import (
 )
 from flask import Flask
 
-# Константа для таймаута сессии (в секундах)
+# Константа для таймаута сессии
 SESSION_TIMEOUT = 300
 
 # Обработка сигналов для корректного завершения
@@ -207,6 +206,8 @@ def save_to_google_sheets(registration: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения в Google Sheets: {e}")
 
+# ==================== ОСНОВНЫЕ ФУНКЦИИ ====================
+
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отправляет главное меню"""
     user_id = update.effective_user.id
@@ -263,104 +264,6 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     return MAIN_MENU
 
-# ВАЖНО: start должна быть доступна ВСЕГДА
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды /start - работает для ВСЕХ пользователей"""
-    logger.info(f"Команда /start от пользователя {update.effective_user.id}")
-    # Очищаем любые данные пользователя
-    context.user_data.clear()
-    # Отправляем главное меню
-    return await send_main_menu(update, context)
-
-async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик всех кнопок"""
-    query = update.callback_query
-    await query.answer()
-    
-    callback_data = query.data
-    logger.info(f"Нажата кнопка: {callback_data}")
-    
-    # Обработка кнопки "Назад в главное меню"
-    if callback_data == "back_to_main":
-        context.user_data.clear()
-        return await send_main_menu(update, context)
-    
-    # Обработка кнопки "Назад к выбору города"
-    elif callback_data == "back_to_city":
-        if context.user_data.get("selected_game"):
-            await show_city_menu(update, context)
-            return CITY_SELECTED
-        else:
-            return await send_main_menu(update, context)
-    
-    # Обработка кнопки "Помощь"
-    elif callback_data == "help":
-        help_text = (
-            "❓ Есть вопрос?\n\n"
-            "Напишите его сюда @Panenka_Registration — поможем разобраться."
-        )
-        keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
-        await query.message.reply_text(
-            help_text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return HELP_MESSAGE
-    
-    # Обработка выбора города
-    elif callback_data.startswith("game_"):
-        try:
-            game_index = int(callback_data.replace("game_", ""))
-            games = load_data().get("games", [])
-            
-            if 0 <= game_index < len(games):
-                selected_game = games[game_index]
-                
-                if not GAME_INFO.get(selected_game, {}).get("active", False):
-                    await query.message.reply_text("Эта игра уже недоступна для регистрации.")
-                    return MAIN_MENU
-                
-                context.user_data["selected_game"] = selected_game
-                logger.info(f"Выбран город: {selected_game}")
-                
-                await show_city_menu(update, context)
-                return CITY_SELECTED
-        except Exception as e:
-            logger.error(f"Ошибка выбора игры: {e}")
-            await query.message.reply_text("Ошибка при выборе города")
-            return MAIN_MENU
-    
-    # Обработка кнопки "Заявить команду"
-    elif callback_data == "start_registration":
-        await query.message.reply_text("Введите название команды 👇")
-        return REGISTER_TEAM
-    
-    # Обработка кнопок легионера
-    elif callback_data in ["legioner_yes", "legioner_no"]:
-        legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
-        context.user_data["legioner"] = legioner_answer
-        logger.info(f"Легионер: {legioner_answer}")
-        await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
-        return REGISTER_CAPTAIN
-    
-    # Обработка кнопки отмены в любом состоянии
-    elif callback_data == "cancel_action":
-        context.user_data.clear()
-        return await send_main_menu(update, context)
-    
-    return MAIN_MENU
-
-async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ответа про легионера"""
-    query = update.callback_query
-    await query.answer()
-    
-    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
-    context.user_data["legioner"] = legioner_answer
-    logger.info(f"Легионер: {legioner_answer}")
-    
-    await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
-    return REGISTER_CAPTAIN
-
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
     query = update.callback_query
@@ -408,6 +311,8 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=menu_text,
             reply_markup=reply_markup
         )
+
+# ==================== ОБРАБОТЧИКИ СООБЩЕНИЙ ====================
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ввода названия команды"""
@@ -570,28 +475,129 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     
     return MAIN_MENU
 
+# ==================== ОБРАБОТЧИКИ КНОПОК ====================
+
+async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ответа про легионера"""
+    query = update.callback_query
+    await query.answer()
+    
+    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
+    context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
+    
+    await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
+    return REGISTER_CAPTAIN
+
+async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик всех кнопок"""
+    query = update.callback_query
+    await query.answer()
+    
+    callback_data = query.data
+    logger.info(f"Нажата кнопка: {callback_data}")
+    
+    # Кнопка "Назад в главное меню"
+    if callback_data == "back_to_main":
+        context.user_data.clear()
+        return await send_main_menu(update, context)
+    
+    # Кнопка "Назад к выбору города"
+    elif callback_data == "back_to_city":
+        if context.user_data.get("selected_game"):
+            await show_city_menu(update, context)
+            return CITY_SELECTED
+        else:
+            return await send_main_menu(update, context)
+    
+    # Кнопка "Помощь"
+    elif callback_data == "help":
+        help_text = (
+            "❓ Есть вопрос?\n\n"
+            "Напишите его сюда @Panenka_Registration — поможем разобраться."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")]]
+        await query.message.reply_text(
+            help_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return HELP_MESSAGE
+    
+    # Выбор города
+    elif callback_data.startswith("game_"):
+        try:
+            game_index = int(callback_data.replace("game_", ""))
+            games = load_data().get("games", [])
+            
+            if 0 <= game_index < len(games):
+                selected_game = games[game_index]
+                
+                if not GAME_INFO.get(selected_game, {}).get("active", False):
+                    await query.message.reply_text("Эта игра уже недоступна для регистрации.")
+                    return MAIN_MENU
+                
+                context.user_data["selected_game"] = selected_game
+                logger.info(f"Выбран город: {selected_game}")
+                
+                await show_city_menu(update, context)
+                return CITY_SELECTED
+        except Exception as e:
+            logger.error(f"Ошибка выбора игры: {e}")
+            await query.message.reply_text("Ошибка при выборе города")
+            return MAIN_MENU
+    
+    # Кнопка "Заявить команду"
+    elif callback_data == "start_registration":
+        await query.message.reply_text("Введите название команды 👇")
+        return REGISTER_TEAM
+    
+    # Кнопки легионера
+    elif callback_data in ["legioner_yes", "legioner_no"]:
+        legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
+        context.user_data["legioner"] = legioner_answer
+        logger.info(f"Легионер: {legioner_answer}")
+        await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
+        return REGISTER_CAPTAIN
+    
+    # Кнопка отмены
+    elif callback_data == "cancel_action":
+        context.user_data.clear()
+        return await send_main_menu(update, context)
+    
+    return MAIN_MENU
+
+# ==================== КОМАНДЫ ====================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start - работает всегда"""
+    logger.info(f"Команда /start от пользователя {update.effective_user.id}")
+    context.user_data.clear()
+    return await send_main_menu(update, context)
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действия - обрабатывает команду /cancel"""
+    """Обработчик команды /cancel"""
     context.user_data.clear()
     await update.message.reply_text("❌ Действие отменено")
     return await send_main_menu(update, context)
+
+# ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 
 def main():
     Thread(target=run_web, daemon=True).start()
     logger.info("🌐 Веб-сервер запущен на порту 10000")
 
     try:
-        # Удаляем вебхук, чтобы избежать конфликта
+        # Удаляем вебхук
         requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", data={"drop_pending_updates": True})
         logger.info("✅ Вебхук удален")
         
         application = Application.builder().token(BOT_TOKEN).build()
 
-        # ВАЖНО: Добавляем обработчик /start ПЕРВЫМ
+        # Добавляем команды
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("cancel", cancel))
 
-        # ConversationHandler обрабатывает все остальные действия
+        # ConversationHandler - только для кнопок
         conv_handler = ConversationHandler(
             entry_points=[CallbackQueryHandler(game_selected)],
             states={
@@ -625,9 +631,11 @@ def main():
 
         application.add_handler(conv_handler)
 
+        print("=" * 50)
         print("✅ Бот запущен!")
         print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
         print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
+        print("=" * 50)
         
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
