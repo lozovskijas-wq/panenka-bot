@@ -343,15 +343,19 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await send_main_menu(update, context)
     
-    # Обработка ответа от кнопки "Назад" в меню помощи
-    elif callback_data == "back_to_city_from_help":
-        if context.user_data.get("selected_game"):
-            await show_city_menu(update, context)
-            return CITY_SELECTED
-        else:
-            return await send_main_menu(update, context)
-    
     return MAIN_MENU
+
+async def legioner_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ответа про легионера"""
+    query = update.callback_query
+    await query.answer()
+    
+    legioner_answer = "Да" if query.data == "legioner_yes" else "Нет"
+    context.user_data["legioner"] = legioner_answer
+    logger.info(f"Легионер: {legioner_answer}")
+    
+    await query.message.reply_text("Напишите имя и номер телефона капитана 👇")
+    return REGISTER_CAPTAIN
 
 async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню для выбранного города"""
@@ -575,11 +579,12 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
+        # ВАЖНО: добавляем обработчик /start ТОЛЬКО здесь, не в entry_points
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("start", start)],
+            entry_points=[CallbackQueryHandler(game_selected)],  # Убираем CommandHandler("start", start) из entry_points
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
