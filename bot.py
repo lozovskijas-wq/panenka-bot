@@ -577,6 +577,11 @@ def main():
     logger.info("🌐 Веб-сервер запущен на порту 10000")
 
     try:
+        # Сначала удаляем вебхук, чтобы избежать конфликта
+        import requests
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", data={"drop_pending_updates": True})
+        logger.info("✅ Вебхук удален")
+        
         application = Application.builder().token(BOT_TOKEN).build()
 
         # ВАЖНО: добавляем обработчик /start ТОЛЬКО здесь, не в entry_points
@@ -584,7 +589,7 @@ def main():
         application.add_handler(CommandHandler("cancel", cancel))
 
         conv_handler = ConversationHandler(
-            entry_points=[CallbackQueryHandler(game_selected)],  # Убираем CommandHandler("start", start) из entry_points
+            entry_points=[CallbackQueryHandler(game_selected)],
             states={
                 MAIN_MENU: [
                     CallbackQueryHandler(game_selected),
