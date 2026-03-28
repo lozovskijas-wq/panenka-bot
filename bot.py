@@ -23,6 +23,7 @@ from telegram.ext import (
     ContextTypes,
 )
 from flask import Flask
+import threading
 
 # ========== ОБРАБОТКА СИГНАЛОВ ==========
 def signal_handler(sig, frame):
@@ -96,11 +97,38 @@ app = Flask('')
 def home():
     return "OK"
 
+@app.route('/ping')
+def ping():
+    """Эндпоинт для проверки работоспособности"""
+    return "PONG", 200
+
+@app.route('/health')
+def health():
+    """Эндпоинт для health check"""
+    return "OK", 200
+
 def run_web():
     try:
         app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False, threaded=True)
     except Exception as e:
         print(f"⚠️ Ошибка веб-сервера: {e}")
+
+# ========== ФУНКЦИЯ ДЛЯ ПРЕДОТВРАЩЕНИЯ ЗАСЫПАНИЯ ==========
+def keep_alive():
+    """Функция для поддержания активности бота"""
+    while True:
+        try:
+            # Пингуем свой собственный сервер
+            response = requests.get('http://localhost:10000/ping', timeout=5)
+            if response.status_code == 200:
+                print(f"✅ Keep-alive ping успешен - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            else:
+                print(f"⚠️ Keep-alive ping вернул статус {response.status_code}")
+        except Exception as e:
+            print(f"❌ Ошибка keep-alive: {e}")
+        
+        # Ждем 4 минуты (Render может переводить в спячку после 5 минут бездействия)
+        time.sleep(240)
 
 # ========== НАСТРОЙКИ ==========
 SESSION_TIMEOUT = 300
@@ -306,16 +334,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Проверяем, откуда пришел вызов - из сообщения или из callback
         if update.callback_query:
-            # Если это callback, отправляем новое сообщение
             await update.callback_query.message.reply_text(
                 text=welcome_text,
                 reply_markup=reply_markup
             )
             await update.callback_query.message.delete()
         elif update.message:
-            # Если это обычное сообщение
             if os.path.exists('logo.jpg'):
                 with open('logo.jpg', 'rb') as photo:
                     await update.message.reply_photo(
@@ -350,19 +375,16 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # ========== КНОПКА "В МЕНЮ" (главное меню с выбором игры) ==========
     if callback_data == "back_to_main":
         context.user_data.clear()
         return await start(update, context)
     
-    # ========== КНОПКА "НАЗАД" (возврат в предыдущее меню) ==========
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await start(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
-    # ========== ОБРАБОТКА ВЫБОРА ИГРЫ ==========
     elif callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -386,7 +408,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
-    # ========== КНОПКА ПОМОЩИ ==========
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
@@ -400,7 +421,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
-    # ========== ОБРАБОТКА РЕГИСТРАЦИИ ==========
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         logger.info(f"Начало регистрации для {city_name}")
@@ -416,7 +436,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         return REGISTER_TEAM
     
-    # ========== ОБРАБОТКА ПРОМО ==========
     elif callback_data == "promo_yes":
         await query.message.reply_text("Из какой вы команды?")
         return PROMO_TEAM
@@ -454,7 +473,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_terms_menu(update, context)
         return CITY_SELECTED
     
-    # ========== ОБРАБОТКА ЛЕГИОНЕРА ==========
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
@@ -465,7 +483,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
-    # ========== ОБРАБОТКА РЕГИСТРАЦИИ КОМАНДЫ ==========
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
@@ -500,7 +517,6 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Если команда ещё не заявлена – сейчас самое время это сделать."
     )
     
-    # Кнопка "Назад" в описании игры ведет в главное меню
     keyboard = [
         [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
         [
@@ -555,7 +571,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
 
-# ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ (оставляем без изменений) ==========
+# ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ ==========
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == '/start':
@@ -842,7 +858,6 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Обработка callback кнопки "Назад" из помощи
     if update.callback_query:
         query = update.callback_query
         await query.answer()
@@ -902,12 +917,21 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     print("🚀 Запуск бота...")
     
+    # Запускаем веб-сервер
     try:
         web_thread = Thread(target=run_web, daemon=True)
         web_thread.start()
         print("🌐 Веб-сервер запущен")
     except Exception as e:
         print(f"⚠️ Ошибка веб-сервера: {e}")
+    
+    # Запускаем поток для поддержания активности
+    try:
+        keep_alive_thread = Thread(target=keep_alive, daemon=True)
+        keep_alive_thread.start()
+        print("🔄 Keep-alive поток запущен (пинг каждые 4 минуты)")
+    except Exception as e:
+        print(f"⚠️ Ошибка запуска keep-alive: {e}")
 
     try:
         application = Application.builder().token(BOT_TOKEN).build()
@@ -970,7 +994,7 @@ def main():
 
         print("✅ Бот настроен!")
         print(f"👑 Админы: {get_registration_admin_ids()}")
-        print("🤖 Бот запущен!")
+        print("🤖 Бот запущен и не будет засыпать!")
         
         try:
             application.run_polling(
