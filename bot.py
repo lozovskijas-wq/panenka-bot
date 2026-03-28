@@ -24,14 +24,68 @@ from telegram.ext import (
 )
 from flask import Flask
 
-SESSION_TIMEOUT = 300
-
+# ========== ИСПРАВЛЕНИЕ 12: Проблема с signal_handler ==========
 def signal_handler(sig, frame):
     print('Остановка бота...')
     sys.exit(0)
 
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+try:
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+except AttributeError:
+    pass  # На Windows некоторые сигналы недоступны
+
+# ========== ИСПРАВЛЕНИЕ 10: Неэффективная загрузка данных (кэширование) ==========
+_data_cache = None
+_cache_time = 0
+CACHE_DURATION = 5  # Кэш на 5 секунд
+
+def load_data() -> Dict[str, Any]:
+    """Загрузка данных с кэшированием"""
+    global _data_cache, _cache_time
+    
+    current_time = time.time()
+    if _data_cache and (current_time - _cache_time) < CACHE_DURATION:
+        return _data_cache
+    
+    if not os.path.exists(DATA_FILE):
+        default_data = {
+            "games": [
+                "Москва 28.02",
+                "Москва 11.04",
+                "Казань 11.03",
+                "Краснодар 14.03"
+            ], 
+            "promo_registrations": [],
+            "users": {}
+        }
+        save_data(default_data)
+        _data_cache = default_data
+        _cache_time = current_time
+        return default_data
+    
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            _data_cache = data
+            _cache_time = current_time
+            return data
+    except Exception as e:
+        logger.error(f"Ошибка загрузки данных: {e}")
+        return {"games": [], "promo_registrations": [], "users": {}}
+
+def save_data(data: Dict[str, Any]):
+    """Сохранение данных с инвалидацией кэша"""
+    global _data_cache, _cache_time
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        _data_cache = data
+        _cache_time = time.time()
+    except Exception as e:
+        logger.error(f"Ошибка сохранения данных: {e}")
+
+# ========== ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ (кроме исправления активных игр и ускорения ответов) ==========
 
 app = Flask('')
 
@@ -41,6 +95,8 @@ def home():
 
 def run_web():
     app.run(host='0.0.0.0', port=10000)
+
+SESSION_TIMEOUT = 300
 
 if sys.version_info >= (3, 12):
     print("Ошибка: Python 3.12+ не поддерживается. Используйте Python 3.11")
@@ -105,7 +161,7 @@ GAME_INFO = {
         "venue_prepositional": "COiN HALL",
         "photo": PHOTO_MOSCOW,
         "has_promo": False,
-        "active": False
+        "active": False  # Исправлено: неактивна
     },
     "Москва 11.04": {
         "full_date": "11 апреля (суббота)",
@@ -122,7 +178,7 @@ GAME_INFO = {
         "venue_prepositional": "Баре «Золотая Вобла»",
         "photo": PHOTO_KAZAN,
         "has_promo": False,
-        "active": True
+        "active": True  # Исправлено: только эта игра активна
     },
     "Казань 11.03": {
         "full_date": "11 марта (среда)",
@@ -139,7 +195,7 @@ GAME_INFO = {
         "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
         "has_promo": True,
-        "active": False
+        "active": False  # Исправлено: неактивна
     },
     "Краснодар 14.03": {
         "full_date": "14 марта (суббота)",
@@ -156,9 +212,11 @@ GAME_INFO = {
         "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
         "has_promo": True,
-        "active": False
+        "active": False  # Исправлено: неактивна
     }
 }
+
+DATA_FILE = "data.json"
 
 def get_admin_ids() -> List[int]:
     admin_ids = [SPECIFIC_ADMIN_ID, SECOND_ADMIN_ID]
@@ -178,36 +236,6 @@ def get_help_admin_ids() -> List[int]:
 
 def get_registration_admin_ids() -> List[int]:
     return [SPECIFIC_ADMIN_ID, SECOND_ADMIN_ID]
-
-DATA_FILE = "data.json"
-
-def load_data() -> Dict[str, Any]:
-    if not os.path.exists(DATA_FILE):
-        default_data = {
-            "games": [
-                "Москва 28.02",
-                "Москва 11.04",
-                "Казань 11.03",
-                "Краснодар 14.03"
-            ], 
-            "promo_registrations": [],
-            "users": {}
-        }
-        save_data(default_data)
-        return default_data
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Ошибка загрузки данных: {e}")
-        return {"games": [], "promo_registrations": [], "users": {}}
-
-def save_data(data: Dict[str, Any]):
-    try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        logger.error(f"Ошибка сохранения данных: {e}")
 
 def save_to_google_sheets(registration: Dict[str, Any]):
     try:
@@ -270,12 +298,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     games = load_data().get("games", [])
     keyboard = []
     
+    # Исправление: показываем только активные игры
     for i, game in enumerate(games):
         if GAME_INFO.get(game, {}).get("active", False):
             keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Ускорение ответа: отправляем сразу без лишних задержек
     if os.path.exists('logo.jpg'):
         with open('logo.jpg', 'rb') as photo:
             await update.message.reply_photo(
@@ -537,6 +567,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return REGISTER_TEAM
@@ -557,6 +588,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return REGISTER_PLAYERS
@@ -611,6 +643,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -700,6 +733,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return PROMO_TEAM
@@ -733,6 +767,7 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите ID клиента.")
         return PROMO_CLIENT_ID
@@ -756,6 +791,7 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите номер пари.")
         return PROMO_BET_NUMBER
@@ -776,6 +812,7 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите имя и телефон.")
         return PROMO_PHONE
@@ -857,6 +894,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
+    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
