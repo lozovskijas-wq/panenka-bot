@@ -966,14 +966,24 @@ def main():
         print(f"👑 Админы: {get_registration_admin_ids()}")
         print("🤖 Бот запущен!")
         
-        application.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            timeout=10,
-            drop_pending_updates=True,
-            poll_interval=0.5,
-            read_timeout=10,
-            write_timeout=10
-        )
+        # Добавляем обработку конфликта
+        try:
+            application.run_polling(
+                allowed_updates=Update.ALL_TYPES,
+                timeout=10,
+                drop_pending_updates=True,
+                poll_interval=0.5,
+                read_timeout=10,
+                write_timeout=10
+            )
+        except Exception as e:
+            if "Conflict" in str(e):
+                print("⚠️ Обнаружен конфликт. Ждем 10 секунд и перезапускаемся...")
+                time.sleep(10)
+                os.execl(sys.executable, sys.executable, *sys.argv)
+            else:
+                raise e
+                
     except Exception as e:
         print(f"❌ Ошибка: {e}")
         logger.error(f"Ошибка: {e}")
