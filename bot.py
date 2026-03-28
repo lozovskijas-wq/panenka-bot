@@ -360,6 +360,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return MAIN_MENU
     
     elif callback_data == "back_to_main":
+        context.user_data.clear()
         return await start(update, context)
     
     elif callback_data == "back_to_city":
@@ -631,10 +632,11 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"Новая регистрация: {registration}")
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
+    full_date = game_info.get('full_date', '')
     
     final_message = (
         f"✅ Команда зарегистрирована!\n\n"
-        f"Ждем вас в субботу в {venue_prepositional}\n\n"
+        f"Ждем вас {full_date} в {venue_prepositional}\n\n"
         f"Мы свяжемся с капитаном при необходимости."
     )
     
@@ -786,14 +788,15 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     save_to_google_sheets(promo_registration)
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
+    full_date = game_info.get('full_date', '')
     city_name = selected_game.split()[0] if selected_game else ""
     
     if city_name == "Казань":
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас 11 марта в {venue_prepositional}.\nДо встречи на квизе!"
+        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
     elif city_name == "Краснодар":
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас 14 марта в {venue_prepositional}.\nДо встречи на квизе!"
+        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
     else:
-        final_text = "✅ Участие по ставке подтверждено.\n\nДо встречи на квизе!"
+        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
     
     await update.message.reply_text(
         final_text,
@@ -831,7 +834,6 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
         if query.data == "back_to_city":
             if not context.user_data.get("selected_game"):
                 return await start(update, context)
-            # Важно: показываем меню города и возвращаем CITY_SELECTED
             await show_city_menu(update, context)
             return CITY_SELECTED
         return MAIN_MENU
