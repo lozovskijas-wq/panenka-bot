@@ -306,25 +306,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        if os.path.exists('logo.jpg'):
-            with open('logo.jpg', 'rb') as photo:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=welcome_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            await update.message.reply_text(
+        # Проверяем, откуда пришел вызов - из сообщения или из callback
+        if update.callback_query:
+            # Если это callback, отправляем новое сообщение
+            await update.callback_query.message.reply_text(
                 text=welcome_text,
                 reply_markup=reply_markup
             )
+            await update.callback_query.message.delete()
+        elif update.message:
+            # Если это обычное сообщение
+            if os.path.exists('logo.jpg'):
+                with open('logo.jpg', 'rb') as photo:
+                    await update.message.reply_photo(
+                        photo=photo,
+                        caption=welcome_text,
+                        reply_markup=reply_markup
+                    )
+            else:
+                await update.message.reply_text(
+                    text=welcome_text,
+                    reply_markup=reply_markup
+                )
         
         print(f"✅ Ответ отправлен")
         return MAIN_MENU
         
     except Exception as e:
         print(f"❌ Ошибка: {e}")
-        await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+        logger.error(f"Ошибка: {e}")
+        if update.callback_query:
+            await update.callback_query.message.reply_text("Произошла ошибка. Попробуйте позже.")
+        elif update.message:
+            await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
         return MAIN_MENU
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -541,7 +555,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.message.reply_text(terms_text, reply_markup=reply_markup)
 
-# ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ ==========
+# ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ (оставляем без изменений) ==========
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == '/start':
@@ -649,7 +663,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
         f"Мы свяжемся с капитаном при необходимости."
     )
     
-    # Кнопка "В меню" ведет в главное меню с выбором игр
     keyboard = [
         [
             InlineKeyboardButton("❓ Помощь", callback_data="help"),
@@ -678,8 +691,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
             logger.error(f"Ошибка админу {admin_id}: {e}")
 
     return MAIN_MENU
-
-# ========== ПРОМО ОБРАБОТЧИКИ ==========
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == '/start':
