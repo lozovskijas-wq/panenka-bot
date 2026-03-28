@@ -438,7 +438,6 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["legioner"] = legioner_answer
         logger.info(f"Легионер: {legioner_answer}")
         
-        # Убрали пример
         await query.message.reply_text(
             text="Напишите имя и номер телефона капитана 👇"
         )
@@ -535,6 +534,9 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ ==========
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return REGISTER_TEAM
@@ -552,6 +554,9 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков.")
         return REGISTER_PLAYERS
@@ -589,6 +594,9 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана.")
         return REGISTER_CAPTAIN
@@ -624,14 +632,12 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
-    # Измененное финальное сообщение - только две кнопки
     final_message = (
         f"✅ Команда зарегистрирована!\n\n"
         f"Ждем вас в субботу в {venue_prepositional}\n\n"
         f"Мы свяжемся с капитаном при необходимости."
     )
     
-    # Только две кнопки: помощь и вернуться в меню
     keyboard = [
         [
             InlineKeyboardButton("❓ Помощь", callback_data="help"),
@@ -664,6 +670,9 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 # ========== ПРОМО ОБРАБОТЧИКИ ==========
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return PROMO_TEAM
@@ -694,6 +703,9 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите ID клиента.")
         return PROMO_CLIENT_ID
@@ -714,6 +726,9 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return PROMO_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите номер пари.")
         return PROMO_BET_NUMBER
@@ -731,6 +746,9 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '/start':
+        return await start(update, context)
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите имя и телефон.")
         return PROMO_PHONE
@@ -813,11 +831,16 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
         if query.data == "back_to_city":
             if not context.user_data.get("selected_game"):
                 return await start(update, context)
+            # Важно: показываем меню города и возвращаем CITY_SELECTED
             await show_city_menu(update, context)
             return CITY_SELECTED
         return MAIN_MENU
     
-    if update.message.text.startswith('/'):
+    # Обработка команды /start
+    if update.message and update.message.text == '/start':
+        return await start(update, context)
+    
+    if update.message and update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
     
@@ -846,7 +869,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception as e:
             logger.error(f"Ошибка админу {admin_id}: {e}")
     
-    return MAIN_MENU
+    return HELP_MESSAGE
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -913,8 +936,8 @@ def main():
                 ],
             },
             fallbacks=[
-                CommandHandler("cancel", cancel),
                 CommandHandler("start", start),
+                CommandHandler("cancel", cancel),
                 CommandHandler("reset", reset),
             ],
             allow_reentry=True,
