@@ -336,23 +336,18 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # Обработка кнопки "Назад" из меню города
+    # ========== ОБРАБОТКА ВСЕХ КНОПОК НАВИГАЦИИ ==========
     if callback_data == "back_to_main":
         context.user_data.clear()
         return await start(update, context)
     
-    # Обработка кнопки "Назад" из информации о городе
     elif callback_data == "back_to_city":
         if not context.user_data.get("selected_game"):
             return await start(update, context)
         await show_city_menu(update, context)
         return CITY_SELECTED
     
-    # Обработка кнопки "В меню" из финального сообщения
-    elif callback_data == "back_to_main":
-        context.user_data.clear()
-        return await start(update, context)
-    
+    # ========== ОБРАБОТКА ВЫБОРА ИГРЫ ==========
     elif callback_data.startswith("game_"):
         try:
             game_index = int(callback_data.replace("game_", ""))
@@ -376,6 +371,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Ошибка при выборе города")
             return MAIN_MENU
     
+    # ========== ОБРАБОТКА КНОПКИ ПОМОЩИ ==========
     elif callback_data == "help":
         help_text = (
             "❓ Есть вопрос?\n\n"
@@ -389,6 +385,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HELP_MESSAGE
     
+    # ========== ОБРАБОТКА РЕГИСТРАЦИИ ==========
     elif callback_data == "start_registration":
         city_name = context.user_data.get("selected_game", "")
         logger.info(f"Начало регистрации для {city_name}")
@@ -404,6 +401,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         return REGISTER_TEAM
     
+    # ========== ОБРАБОТКА ПРОМО ==========
     elif callback_data == "promo_yes":
         await query.message.reply_text("Из какой вы команды?")
         return PROMO_TEAM
@@ -441,6 +439,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_terms_menu(update, context)
         return CITY_SELECTED
     
+    # ========== ОБРАБОТКА ЛЕГИОНЕРА ==========
     elif callback_data in ["legioner_yes", "legioner_no"]:
         legioner_answer = "Да" if callback_data == "legioner_yes" else "Нет"
         context.user_data["legioner"] = legioner_answer
@@ -451,6 +450,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REGISTER_CAPTAIN
     
+    # ========== ОБРАБОТКА РЕГИСТРАЦИИ КОМАНДЫ ==========
     elif callback_data == "register_team":
         await query.message.reply_text("Введите название команды 👇")
         return REGISTER_TEAM
@@ -542,6 +542,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ ==========
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -562,6 +563,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -602,6 +604,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -679,6 +682,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 # ========== ПРОМО ОБРАБОТЧИКИ ==========
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -712,6 +716,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -735,6 +740,7 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return PROMO_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -755,6 +761,7 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -839,6 +846,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
             return CITY_SELECTED
         return MAIN_MENU
     
+    # Обработка команды /start
     if update.message and update.message.text == '/start':
         return await start(update, context)
     
