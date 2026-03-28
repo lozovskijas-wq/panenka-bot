@@ -438,8 +438,9 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["legioner"] = legioner_answer
         logger.info(f"Легионер: {legioner_answer}")
         
+        # Убрали пример
         await query.message.reply_text(
-            text="Напишите имя и номер телефона капитана 👇\n\nПример: Иван Иванов, +7 999 123-45-67"
+            text="Напишите имя и номер телефона капитана 👇"
         )
         return REGISTER_CAPTAIN
     
@@ -623,29 +624,20 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     
-    if selected_game == "Москва 11.04":
-        final_message = (
-            f"✅ Команда зарегистрирована!\n\n"
-            f"Ждем вас в субботу в {venue_prepositional}\n\n"
-            f"Мы свяжемся с капитаном при необходимости."
-        )
-        keyboard = [
-            [InlineKeyboardButton("🔙 В главное меню", callback_data="back_to_main")]
+    # Измененное финальное сообщение - только две кнопки
+    final_message = (
+        f"✅ Команда зарегистрирована!\n\n"
+        f"Ждем вас в субботу в {venue_prepositional}\n\n"
+        f"Мы свяжемся с капитаном при необходимости."
+    )
+    
+    # Только две кнопки: помощь и вернуться в меню
+    keyboard = [
+        [
+            InlineKeyboardButton("❓ Помощь", callback_data="help"),
+            InlineKeyboardButton("🔙 В меню", callback_data="back_to_main")
         ]
-    else:
-        final_message = (
-            f"✅ Команда зарегистрирована!\n\n"
-            f"Мы свяжемся с капитаном при необходимости.\n\n"
-            f"Если кто-то из игроков хочет пойти бесплатно — можно оформить участие по ставке прямо здесь 👇"
-        )
-        keyboard = [
-            [InlineKeyboardButton("🎟️ Прийти по ставке", callback_data="start_promo_registration")],
-            [InlineKeyboardButton("📋 Условия акции", callback_data="promo_terms")],
-            [
-                InlineKeyboardButton("❓ Помощь", callback_data="help"),
-                InlineKeyboardButton("🔙 Назад", callback_data="back_to_city")
-            ]
-        ]
+    ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(final_message, reply_markup=reply_markup)
@@ -735,7 +727,7 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data["last_action"] = datetime.now().timestamp()
     logger.info(f"Номер пари: {bet_number}")
     
-    await update.message.reply_text("Напишите имя и номер телефона 👇\n\nПример: Иван Иванов, +7 999 123-45-67")
+    await update.message.reply_text("Напишите имя и номер телефона 👇")
     return PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -814,6 +806,17 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return MAIN_MENU
 
 async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка callback кнопки "Назад"
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        if query.data == "back_to_city":
+            if not context.user_data.get("selected_game"):
+                return await start(update, context)
+            await show_city_menu(update, context)
+            return CITY_SELECTED
+        return MAIN_MENU
+    
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
@@ -905,6 +908,7 @@ def main():
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
                 ],
                 HELP_MESSAGE: [
+                    CallbackQueryHandler(help_message_received),
                     MessageHandler(filters.TEXT & ~filters.COMMAND, help_message_received),
                 ],
             },
