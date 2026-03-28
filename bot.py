@@ -336,7 +336,7 @@ async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data["last_action"] = datetime.now().timestamp()
     
-    # ========== ОБРАБОТКА ВСЕХ КНОПОК НАВИГАЦИИ ==========
+    # ========== ОБРАБОТКА КНОПОК НАВИГАЦИИ ==========
     if callback_data == "back_to_main":
         context.user_data.clear()
         return await start(update, context)
