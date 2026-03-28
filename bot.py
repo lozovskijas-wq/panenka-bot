@@ -85,7 +85,7 @@ def save_data(data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
 
-# ========== ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ (кроме исправления активных игр и ускорения ответов) ==========
+# ========== ОСТАЛЬНОЙ КОД ==========
 
 app = Flask('')
 
@@ -94,7 +94,10 @@ def home():
     return "OK"
 
 def run_web():
-    app.run(host='0.0.0.0', port=10000)
+    try:
+        app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"⚠️ Ошибка веб-сервера: {e}")
 
 SESSION_TIMEOUT = 300
 
@@ -123,11 +126,16 @@ if not BOT_TOKEN:
     print("ERROR: BOT_TOKEN is not set")
     sys.exit(1)
 
+# Настройка логирования
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Отключаем лишние логи от библиотек
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
 
 (
     MAIN_MENU,
@@ -161,7 +169,7 @@ GAME_INFO = {
         "venue_prepositional": "COiN HALL",
         "photo": PHOTO_MOSCOW,
         "has_promo": False,
-        "active": False  # Исправлено: неактивна
+        "active": False
     },
     "Москва 11.04": {
         "full_date": "11 апреля (суббота)",
@@ -178,7 +186,7 @@ GAME_INFO = {
         "venue_prepositional": "Баре «Золотая Вобла»",
         "photo": PHOTO_KAZAN,
         "has_promo": False,
-        "active": True  # Исправлено: только эта игра активна
+        "active": True
     },
     "Казань 11.03": {
         "full_date": "11 марта (среда)",
@@ -195,7 +203,7 @@ GAME_INFO = {
         "venue_prepositional": "Ресторане MAXIMILIAN'S",
         "photo": PHOTO_KAZAN,
         "has_promo": True,
-        "active": False  # Исправлено: неактивна
+        "active": False
     },
     "Краснодар 14.03": {
         "full_date": "14 марта (суббота)",
@@ -212,7 +220,7 @@ GAME_INFO = {
         "venue_prepositional": "баре NAMESTI",
         "photo": PHOTO_KRASNODAR,
         "has_promo": True,
-        "active": False  # Исправлено: неактивна
+        "active": False
     }
 }
 
@@ -277,49 +285,62 @@ async def check_session_timeout(update: Update, context: ContextTypes.DEFAULT_TY
     return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    
-    data = load_data()
-    if "users" not in data:
-        data["users"] = {}
-    data["users"][str(user_id)] = chat_id
-    save_data(data)
-    
-    context.user_data.clear()
-    context.user_data["last_action"] = datetime.now().timestamp()
-    
-    welcome_text = (
-        "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
-        "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
-        "Выберите город и дату 👇"
-    )
-    
-    games = load_data().get("games", [])
-    keyboard = []
-    
-    # Исправление: показываем только активные игры
-    for i, game in enumerate(games):
-        if GAME_INFO.get(game, {}).get("active", False):
-            keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Ускорение ответа: отправляем сразу без лишних задержек
-    if os.path.exists('logo.jpg'):
-        with open('logo.jpg', 'rb') as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=welcome_text,
+    """Обработчик команды /start"""
+    try:
+        print(f"📥 Получена команда /start от {update.effective_user.id}")
+        
+        user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+        
+        data = load_data()
+        if "users" not in data:
+            data["users"] = {}
+        data["users"][str(user_id)] = chat_id
+        save_data(data)
+        
+        context.user_data.clear()
+        context.user_data["last_action"] = datetime.now().timestamp()
+        
+        welcome_text = (
+            "Привет! На связи футбольный квиз «Паненка» ✌🏻\n\n"
+            "Этот бот поможет вашей команде попасть на ближайший квиз.\n\n"
+            "Выберите город и дату 👇"
+        )
+        
+        games = load_data().get("games", [])
+        keyboard = []
+        
+        # Показываем только активные игры
+        for i, game in enumerate(games):
+            if GAME_INFO.get(game, {}).get("active", False):
+                keyboard.append([InlineKeyboardButton(game, callback_data=f"game_{i}")])
+        
+        print(f"📋 Активные игры: {keyboard}")
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Отправляем сообщение
+        if os.path.exists('logo.jpg'):
+            with open('logo.jpg', 'rb') as photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=welcome_text,
+                    reply_markup=reply_markup
+                )
+        else:
+            await update.message.reply_text(
+                text=welcome_text,
                 reply_markup=reply_markup
             )
-    else:
-        await update.message.reply_text(
-            text=welcome_text,
-            reply_markup=reply_markup
-        )
-    
-    return MAIN_MENU
+        
+        print("✅ Сообщение отправлено")
+        return MAIN_MENU
+        
+    except Exception as e:
+        print(f"❌ Ошибка в start: {e}")
+        logger.error(f"Ошибка в start: {e}")
+        await update.message.reply_text("Произошла ошибка. Пожалуйста, попробуйте позже.")
+        return MAIN_MENU
 
 async def game_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -460,46 +481,26 @@ async def show_city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game_info = GAME_INFO.get(selected_game, {})
     photo_file = game_info.get('photo')
     
-    if selected_game == "Москва 11.04":
-        menu_text = (
-            f"📍 Москва – 11 апреля (суббота)\n\n"
-            f"🏟 {game_info['venue_short']}\n"
-            f"📫 {game_info['venue_full']}\n\n"
-            f"🕖 Двери открыты с {game_info['time_open']}\n"
-            f"⚽️ Старт игры – {game_info['time_start']}\n\n"
-            f"💰 Стоимость участия:\n"
-            f"{game_info['price_jersey']} – в джерси любого клуба или сборной,\n"
-            f"{game_info['price_regular']} – в обычной одежде\n\n"
-            f"Если команда уже заявлена другим способом – повторная регистрация не нужна.\n\n"
-            f"Если команда ещё не заявлена – сейчас самое время это сделать."
-        )
-        keyboard = [
-            [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
-            [
-                InlineKeyboardButton("❓ Помощь", callback_data="help"),
-                InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")
-            ]
+    menu_text = (
+        f"📍 {selected_game}\n\n"
+        f"🏟️ {game_info['venue_short']}\n"
+        f"📫 {game_info['venue_full']}\n\n"
+        f"🕖 Двери открыты с {game_info['time_open']}\n"
+        f"⚽ Старт игры – {game_info['time_start']}\n\n"
+        f"💰 Стоимость участия:\n"
+        f"{game_info['price_jersey']} – в джерси любого клуба или сборной,\n"
+        f"{game_info['price_regular']} – в обычной одежде\n\n"
+        f"Если команда уже заявлена другим способом – повторная регистрация не нужна.\n\n"
+        f"Если команда ещё не заявлена – сейчас самое время это сделать."
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
+        [
+            InlineKeyboardButton("❓ Помощь", callback_data="help"),
+            InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")
         ]
-    else:
-        menu_text = (
-            f"📍 {selected_game}\n\n"
-            f"🏟️ {game_info['venue_short']}\n"
-            f"📫 {game_info['venue_full']}\n\n"
-            f"🕖 Двери открыты с {game_info['time_open']}\n"
-            f"⚽ Старт игры – {game_info['time_start']}\n\n"
-            f"💰 Стоимость участия:\n"
-            f"{game_info['price_jersey']} – в джерси любого клуба или сборной,\n"
-            f"{game_info['price_regular']} – в обычной одежде\n\n"
-            f"Если команда уже заявлена другим способом – повторная регистрация не нужна.\n\n"
-            f"Если команда ещё не заявлена – сейчас самое время это сделать."
-        )
-        keyboard = [
-            [InlineKeyboardButton("📄 Заявить команду", callback_data="start_registration")],
-            [
-                InlineKeyboardButton("❓ Помощь", callback_data="help"),
-                InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")
-            ]
-        ]
+    ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -520,34 +521,18 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    selected_game = context.user_data.get("selected_game")
-    
-    if selected_game == "Казань 11.03":
-        terms_text = (
-            "📋 Условия участия по ставке\n\n"
-            "1. Минимальная сумма пари - 700₽.\n"
-            "2. Тип пари - ординар, коэффициент - от 1.5 до 3.\n"
-            "3. Пари должно быть заключено в период с 24 февраля по 10 марта.\n"
-            "4. Бесплатное участие предоставляется игроку, с аккаунта которого было заключено пари.\n"
-            "5. Для оформления необходимо указать:\n"
-            "   — ID клиента\n"
-            "   — Номер пари\n"
-            "6. Команда должна быть зарегистрирована на игру.\n"
-            "7. Организатор вправе проверить корректность предоставленных данных."
-        )
-    else:
-        terms_text = (
-            "📋 Условия участия по ставке\n\n"
-            "1. Минимальная сумма пари - 700₽.\n"
-            "2. Тип пари - ординар, коэффициент - от 1.5 до 3.\n"
-            "3. Пари должно быть заключено в период с 24 февраля по 13 марта.\n"
-            "4. Бесплатное участие предоставляется игроку, с аккаунта которого было заключено пари.\n"
-            "5. Для оформления необходимо указать:\n"
-            "   — ID клиента\n"
-            "   — Номер пари\n"
-            "6. Команда должна быть зарегистрирована на игру.\n"
-            "7. Организатор вправе проверить корректность предоставленных данных."
-        )
+    terms_text = (
+        "📋 Условия участия по ставке\n\n"
+        "1. Минимальная сумма пари - 700₽.\n"
+        "2. Тип пари - ординар, коэффициент - от 1.5 до 3.\n"
+        "3. Пари должно быть заключено в период с 24 февраля по 13 марта.\n"
+        "4. Бесплатное участие предоставляется игроку, с аккаунта которого было заключено пари.\n"
+        "5. Для оформления необходимо указать:\n"
+        "   — ID клиента\n"
+        "   — Номер пари\n"
+        "6. Команда должна быть зарегистрирована на игру.\n"
+        "7. Организатор вправе проверить корректность предоставленных данных."
+    )
     
     keyboard = [
         [
@@ -567,7 +552,6 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды, а не команду.")
         return REGISTER_TEAM
@@ -588,7 +572,6 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите количество игроков, а не команду.")
         return REGISTER_PLAYERS
@@ -643,7 +626,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите данные капитана, а не команду.")
         return REGISTER_CAPTAIN
@@ -657,7 +639,6 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
     selected_game = context.user_data.get("selected_game", "")
     team_name = context.user_data.get("team_name", "")
     game_info = GAME_INFO.get(selected_game, {})
-    city_name = selected_game.split()[0] if selected_game else ""
 
     registration = {
         "user_id": user.id,
@@ -729,11 +710,11 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 
     return MAIN_MENU
 
+# Пропущенные функции для промо (оставляем как в оригинале)
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите название команды.")
         return PROMO_TEAM
@@ -767,7 +748,6 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите ID клиента.")
         return PROMO_CLIENT_ID
@@ -791,7 +771,6 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите номер пари.")
         return PROMO_BET_NUMBER
@@ -812,7 +791,6 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, введите имя и телефон.")
         return PROMO_PHONE
@@ -894,7 +872,6 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
     if await check_session_timeout(update, context):
         return MAIN_MENU
     
-    # Ускорение ответа: сразу обрабатываем сообщение
     if update.message.text.startswith('/'):
         await update.message.reply_text("Пожалуйста, напишите ваш вопрос.")
         return HELP_MESSAGE
@@ -938,11 +915,21 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await start(update, context)
 
 def main():
-    Thread(target=run_web, daemon=True).start()
-    logger.info("🌐 Веб-сервер запущен на порту 10000")
+    """Главная функция запуска бота"""
+    print("🚀 Запуск бота...")
+    
+    # Запускаем веб-сервер в отдельном потоке
+    try:
+        web_thread = Thread(target=run_web, daemon=True)
+        web_thread.start()
+        print("🌐 Веб-сервер запущен на порту 10000")
+    except Exception as e:
+        print(f"⚠️ Ошибка запуска веб-сервера: {e}")
 
     try:
+        # Создаем приложение
         application = Application.builder().token(BOT_TOKEN).build()
+        print("✅ Приложение создано")
 
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
@@ -999,10 +986,12 @@ def main():
         application.add_handler(conv_handler)
         application.add_handler(CommandHandler("reset", reset))
 
-        print("✅ Бот запущен!")
+        print("✅ Бот успешно настроен!")
         print(f"👑 Админы для регистраций: {get_registration_admin_ids()}")
         print(f"👑 Админ для вопросов: {get_help_admin_ids()}")
+        print("🤖 Бот запущен и готов к работе!")
         
+        # Запускаем бота
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
             timeout=30,
@@ -1010,6 +999,7 @@ def main():
             poll_interval=1.0
         )
     except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
         logger.error(f"Критическая ошибка: {e}")
         time.sleep(5)
         os.execl(sys.executable, sys.executable, *sys.argv)
@@ -1018,6 +1008,7 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
         logger.error(f"Критическая ошибка: {e}")
         time.sleep(5)
         os.execl(sys.executable, sys.executable, *sys.argv)
