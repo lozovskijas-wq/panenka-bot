@@ -535,6 +535,7 @@ async def show_terms_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========== ТЕКСТОВЫЕ ОБРАБОТЧИКИ ==========
 
 async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -555,6 +556,7 @@ async def team_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return REGISTER_PLAYERS
 
 async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -595,6 +597,7 @@ async def player_count_received(update: Update, context: ContextTypes.DEFAULT_TY
     return REGISTER_LEGIONER
 
 async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -672,6 +675,7 @@ async def captain_info_received(update: Update, context: ContextTypes.DEFAULT_TY
 # ========== ПРОМО ОБРАБОТЧИКИ ==========
 
 async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -705,6 +709,7 @@ async def promo_team_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_CLIENT_ID
 
 async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -728,6 +733,7 @@ async def client_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return PROMO_BET_NUMBER
 
 async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -748,6 +754,7 @@ async def bet_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     return PROMO_PHONE
 
 async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Обработка команды /start в любом состоянии
     if update.message.text == '/start':
         return await start(update, context)
     
@@ -789,7 +796,6 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
 
     venue_prepositional = game_info.get('venue_prepositional', game_info.get('venue_short', ''))
     full_date = game_info.get('full_date', '')
-    city_name = selected_game.split()[0] if selected_game else ""
     
     final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
     
@@ -836,7 +842,7 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
             return await start(update, context)
         return MAIN_MENU
     
-    # Обработка команды /start
+    # Обработка команды /start в любом состоянии
     if update.message and update.message.text == '/start':
         return await start(update, context)
     
