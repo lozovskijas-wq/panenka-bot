@@ -791,12 +791,7 @@ async def promo_phone_received(update: Update, context: ContextTypes.DEFAULT_TYP
     full_date = game_info.get('full_date', '')
     city_name = selected_game.split()[0] if selected_game else ""
     
-    if city_name == "Казань":
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
-    elif city_name == "Краснодар":
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
-    else:
-        final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
+    final_text = f"✅ Участие по ставке подтверждено.\n\nЖдём вас {full_date} в {venue_prepositional}.\nДо встречи на квизе!"
     
     await update.message.reply_text(
         final_text,
@@ -836,6 +831,9 @@ async def help_message_received(update: Update, context: ContextTypes.DEFAULT_TY
                 return await start(update, context)
             await show_city_menu(update, context)
             return CITY_SELECTED
+        elif query.data == "back_to_main":
+            context.user_data.clear()
+            return await start(update, context)
         return MAIN_MENU
     
     # Обработка команды /start
@@ -910,27 +908,34 @@ def main():
                 ],
                 REGISTER_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, team_name_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_PLAYERS: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, player_count_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_LEGIONER: [
                     CallbackQueryHandler(game_selected),
                 ],
                 REGISTER_CAPTAIN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, captain_info_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_TEAM: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_team_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_CLIENT_ID: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, client_id_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_BET_NUMBER: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, bet_number_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 PROMO_PHONE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, promo_phone_received),
+                    CallbackQueryHandler(game_selected),
                 ],
                 HELP_MESSAGE: [
                     CallbackQueryHandler(help_message_received),
